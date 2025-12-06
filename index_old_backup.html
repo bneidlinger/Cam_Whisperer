@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CamOpt AI - Camera Settings Optimizer (v0.1)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #060814;
+      --bg-alt: #0d111f;
+      --card: #111827;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56,189,248,0.12);
+      --border: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --danger: #f97373;
+      --success: #4ade80;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0b1220, #020617 60%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1200px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: linear-gradient(145deg, #020617, #020617 40%, #020617 70%, #020617);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 18px 20px 20px;
+      box-shadow: 0 22px 45px rgba(15,23,42,0.85);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: -60px;
+      opacity: 0.15;
+      background: radial-gradient(circle at top left, rgba(56,189,248,0.5), transparent 55%);
+      pointer-events: none;
+    }
+
+    .card-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-pill {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(56,189,248,0.4);
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.4);
+      color: var(--muted);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .field-group {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      background: #020617;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 7px 9px;
+      color: var(--text);
+      font-size: 0.86rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.35);
+      background: #020617;
+    }
+
+    textarea {
+      min-height: 60px;
+      resize: vertical;
+    }
+
+    .hint {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border), transparent);
+      margin: 12px 0;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, background 0.12s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+      color: #0b1120;
+      box-shadow: 0 12px 26px rgba(56,189,248,0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 34px rgba(56,189,248,0.5);
+    }
+
+    .btn-ghost {
+      background: rgba(15,23,42,0.9);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .btn-ghost:hover {
+      background: #020617;
+      border-color: rgba(148,163,184,0.7);
+    }
+
+    .status-pill {
+      font-size: 0.7rem;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(56,189,248,0.9);
+    }
+
+    .status-dot.idle {
+      background: var(--muted);
+      box-shadow: none;
+    }
+
+    .status-dot.error {
+      background: var(--danger);
+      box-shadow: 0 0 10px rgba(248,113,113,0.9);
+    }
+
+    .status-dot.ok {
+      background: var(--success);
+      box-shadow: 0 0 10px rgba(74,222,128,0.9);
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .results-title {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .results-body {
+      background: #020617;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 10px 11px;
+      max-height: 360px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+
+    .results-empty {
+      color: var(--muted);
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .results-empty span {
+      font-size: 1rem;
+    }
+
+    .mini-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+      font-size: 0.7rem;
+    }
+
+    .pill {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    small.code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .footer-note {
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    input[type="file"] {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .file-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.98);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.8rem;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 12px 30px rgba(15,23,42,0.9);
+      z-index: 99;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- LEFT: INPUT FORM -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="header">
+          <div>
+            <div class="title">
+              <span>CamOpt AI Console</span>
+              <span class="title-pill">Prototype v0.1</span>
+            </div>
+            <div class="subtitle">
+              Feed it camera context, get optimal starting settings for your VMS / NVR.
+              <a href="whitepaper.html" style="color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent);">Read the technical whitepaper</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="badge-row">
+          <span class="badge">Surveillance Tuning</span>
+          <span class="badge">Low-Light / WDR</span>
+          <span class="badge">Storage vs Quality</span>
+        </div>
+
+        <form id="cam-form">
+          <div class="field-group">
+            <div class="field">
+              <label for="site-name">Site / Customer</label>
+              <input id="site-name" type="text" placeholder="DC01 / Retail North / Campus A" />
+            </div>
+            <div class="field">
+              <label for="camera-id">Camera ID / Label</label>
+              <input id="camera-id" type="text" placeholder="L1-CAM-104" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="camera-model">Camera Model</label>
+              <input id="camera-model" type="text" placeholder="Hanwha QNV-7080R / Axis P3245 / Avigilon H5" />
+              <span class="hint">Exact model helps; generic is fine for now.</span>
+            </div>
+            <div class="field">
+              <label for="vms">VMS / NVR Platform</label>
+              <select id="vms">
+                <option value="">Select platform (optional)</option>
+                <option>Avigilon ACC</option>
+                <option>Genetec Security Center</option>
+                <option>Milestone XProtect</option>
+                <option>Exacq</option>
+                <option>Hanwha WAVE</option>
+                <option>Other / Mixed</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="scene-type">Scene Type</label>
+              <select id="scene-type" required>
+                <option value="">Choose...</option>
+                <option value="indoor-hallway">Indoor hallway / corridor</option>
+                <option value="indoor-room">Indoor room / office</option>
+                <option value="entrance-hdr">Entrance / lobby (strong backlight)</option>
+                <option value="parking-lot">Parking lot / open outdoor</option>
+                <option value="loading-dock">Loading dock / semi-covered</option>
+                <option value="stairwell">Stairwell</option>
+                <option value="lowlight-yard">Very low-light yard / perimeter</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="purpose">Primary Purpose</label>
+              <select id="purpose" required>
+                <option value="">Choose...</option>
+                <option value="overview">Overview / situational awareness</option>
+                <option value="faces">Recognize faces</option>
+                <option value="plates">License plates</option>
+                <option value="evidence">Investigation-grade detail</option>
+                <option value="analytics">Analytics (people counting, loitering, etc.)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="lighting">Lighting Conditions</label>
+              <select id="lighting">
+                <option value="">Typical</option>
+                <option value="static">Mostly static, consistent light</option>
+                <option value="variable">Variable (clouds, headlights, etc.)</option>
+                <option value="hdr">Extreme contrast / HDR needed</option>
+                <option value="dark">Very dark / IR dependent</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="motion-level">Typical Motion</label>
+              <select id="motion-level">
+                <option value="">Normal</option>
+                <option value="low">Low (few people/vehicles)</option>
+                <option value="medium">Medium</option>
+                <option value="high">High (busy corridor, highway, entrance)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="bandwidth">Per-Camera Bandwidth Budget (Mbps)</label>
+              <input id="bandwidth" type="number" step="0.1" min="0" placeholder="e.g. 4" />
+              <span class="hint">Rough limit you’re comfortable with, per stream.</span>
+            </div>
+            <div class="field">
+              <label for="retention">Target Retention (days)</label>
+              <input id="retention" type="number" min="1" placeholder="e.g. 30" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="notes">Notes / Special Requirements</label>
+              <textarea id="notes" placeholder="Glass in front of camera, high glare, specific angle, local law requirements, etc."></textarea>
+            </div>
+            <div class="field">
+              <label>Sample Frame (optional)</label>
+              <input id="frame-file" type="file" accept="image/*" />
+              <span class="file-label" id="file-label">No file selected</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <div class="actions">
+              <button type="submit" class="btn-primary" id="run-btn">
+                ⚙️ Generate Recommended Settings
+              </button>
+              <button type="button" class="btn-ghost" id="reset-btn">
+                ♻️ Reset
+              </button>
+            </div>
+            <div class="status-pill" id="status-pill">
+              <span class="status-dot idle" id="status-dot"></span>
+              <span id="status-text">Idle — ready to optimize.</span>
+            </div>
+          </div>
+        </form>
+
+        <div class="footer-note">
+          TODO: Wire this UI to your AI backend / API. For now, logic is heuristic-only in <small class="code">app.js</small>-style code inside this file.
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: RESULTS PANEL -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="results-header">
+          <div>
+            <div class="results-title">Recommended Settings</div>
+            <div class="mini-label">Use as a starting profile; fine-tune in VMS / camera web UI.</div>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn-ghost" id="copy-json-btn">
+              ⧉ Copy JSON
+            </button>
+          </div>
+        </div>
+
+        <div class="results-body" id="results">
+          <div class="results-empty" id="results-empty">
+            <span>⚠️</span>
+            <span>No recommendations yet. Fill the form and click “Generate”.</span>
+          </div>
+          <pre id="results-pre" style="display:none;"></pre>
+        </div>
+
+        <div class="pill-row">
+          <div class="pill">Shutter / motion blur</div>
+          <div class="pill">WDR / backlight</div>
+          <div class="pill">IR / low-light strategy</div>
+          <div class="pill">Bitrate vs FPS vs Retention</div>
+          <div class="pill">Codec selection (H.264/H.265)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <span id="toast-icon">✅</span>
+    <span id="toast-text">Copied to clipboard.</span>
+  </div>
+
+  <script>
+    const form = document.getElementById("cam-form");
+    const runBtn = document.getElementById("run-btn");
+    const resetBtn = document.getElementById("reset-btn");
+    const statusDot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    const resultsEmpty = document.getElementById("results-empty");
+    const resultsPre = document.getElementById("results-pre");
+    const copyJsonBtn = document.getElementById("copy-json-btn");
+    const frameFileInput = document.getElementById("frame-file");
+    const fileLabel = document.getElementById("file-label");
+    const toast = document.getElementById("toast");
+    const toastIcon = document.getElementById("toast-icon");
+    const toastText = document.getElementById("toast-text");
+
+    frameFileInput.addEventListener("change", () => {
+      const file = frameFileInput.files[0];
+      fileLabel.textContent = file ? file.name : "No file selected";
+    });
+
+    function setStatus(mode, message) {
+      statusDot.classList.remove("idle", "error", "ok");
+      if (mode === "idle") statusDot.classList.add("idle");
+      if (mode === "error") statusDot.classList.add("error");
+      if (mode === "ok") statusDot.classList.add("ok");
+      statusText.textContent = message;
+    }
+
+    function showToast(message, ok = true) {
+      toastText.textContent = message;
+      toastIcon.textContent = ok ? "✅" : "⚠️";
+      toast.style.display = "inline-flex";
+      setTimeout(() => {
+        toast.style.display = "none";
+      }, 2200);
+    }
+
+    function basicHeuristicEngine(input) {
+      // HK-47: crude rules now; replace with real AI later, meatbag.
+      const {
+        sceneType,
+        purpose,
+        lighting,
+        motionLevel,
+        bandwidth,
+        retention
+      } = input;
+
+      const settings = {
+        stream: {
+          resolution: "1920x1080",
+          codec: "H.265",
+          fps: 15,
+          bitrateMbps: 4,
+          keyframeInterval: 2,
+          cbr: true
+        },
+        exposure: {
+          shutter: "1/60",
+          iris: "Auto",
+          gainLimit: "Medium",
+          wdr: "Off",
+          backlightComp: "Off"
+        },
+        lowLight: {
+          irMode: "Auto",
+          irIntensity: "Medium",
+          noiseReduction: "Medium",
+          slowShutter: "Off"
+        },
+        image: {
+          sharpening: "Medium",
+          contrast: "Normal",
+          saturation: "Normal",
+          dewarp: "Off"
+        },
+        recording: {
+          targetRetentionDays: retention || null,
+          motionRecording: true,
+          preRecordSeconds: 5,
+          postRecordSeconds: 15
+        },
+        notes: []
+      };
+
+      // Scene-based adjustments
+      switch (sceneType) {
+        case "indoor-hallway":
+          settings.stream.fps = 15;
+          settings.stream.bitrateMbps = 3;
+          break;
+        case "indoor-room":
+          settings.stream.fps = 12;
+          settings.stream.bitrateMbps = 2.5;
+          break;
+        case "entrance-hdr":
+          settings.exposure.wdr = "High";
+          settings.exposure.backlightComp = "On";
+          settings.stream.bitrateMbps = 4.5;
+          settings.notes.push("Entrance with strong backlight: enable strong WDR and verify faces are not underexposed.");
+          break;
+        case "parking-lot":
+          settings.stream.fps = 15;
+          settings.stream.bitrateMbps = 4;
+          settings.lowLight.irMode = "Auto";
+          settings.lowLight.noiseReduction = "High";
+          settings.notes.push("Parking lots benefit from slightly higher bitrate to handle headlights and motion.");
+          break;
+        case "loading-dock":
+          settings.stream.fps = 15;
+          settings.stream.bitrateMbps = 4;
+          settings.exposure.wdr = "Medium";
+          break;
+        case "stairwell":
+          settings.stream.fps = 10;
+          settings.stream.bitrateMbps = 2;
+          settings.notes.push("Stairwells: lower FPS is usually acceptable unless high activity area.");
+          break;
+        case "lowlight-yard":
+          settings.stream.fps = 12;
+          settings.stream.bitrateMbps = 4;
+          settings.lowLight.irMode = "On";
+          settings.lowLight.irIntensity = "High";
+          settings.lowLight.noiseReduction = "High";
+          settings.lowLight.slowShutter = "On (limit 1/15)";
+          settings.notes.push("Very low-light scenes: IR on, heavier noise reduction, and limited slow shutter to balance motion vs brightness.");
+          break;
+      }
+
+      // Purpose-based adjustments
+      switch (purpose) {
+        case "overview":
+          // defaults fine
+          settings.notes.push("Overview: prioritize coverage over ultra-fine detail.");
+          break;
+        case "faces":
+          settings.stream.fps = Math.max(settings.stream.fps, 15);
+          settings.stream.bitrateMbps += 0.5;
+          settings.exposure.shutter = "1/60 to 1/100";
+          settings.notes.push("Face ID: keep shutter reasonably fast to avoid motion blur at doorways.");
+          break;
+        case "plates":
+          settings.stream.fps = Math.max(settings.stream.fps, 20);
+          settings.stream.bitrateMbps += 1;
+          settings.exposure.shutter = "1/250 to 1/500";
+          settings.exposure.gainLimit = "Low/Medium";
+          settings.lowLight.slowShutter = "Off";
+          settings.notes.push("LPR: fast shutter, no slow shutter, accept darker image if necessary.");
+          break;
+        case "evidence":
+          settings.stream.fps = 20;
+          settings.stream.bitrateMbps += 1;
+          settings.notes.push("Evidence-grade: bump bitrate/FPS; verify retention calculations still hold.");
+          break;
+        case "analytics":
+          settings.stream.fps = Math.max(settings.stream.fps, 12);
+          settings.notes.push("Analytics: ensure FPS meets analytic engine requirements (often 8–12 FPS minimum).");
+          break;
+      }
+
+      // Lighting adjustments
+      switch (lighting) {
+        case "static":
+          // nothing special
+          break;
+        case "variable":
+          settings.exposure.wdr = settings.exposure.wdr === "Off" ? "Medium" : settings.exposure.wdr;
+          settings.notes.push("Variable lighting: WDR medium recommended, verify against ghosting.");
+          break;
+        case "hdr":
+          settings.exposure.wdr = "High";
+          settings.exposure.backlightComp = "On";
+          settings.notes.push("Extreme contrast: use strong WDR and verify artifact levels.");
+          break;
+        case "dark":
+          settings.lowLight.irMode = "On";
+          settings.lowLight.irIntensity = "High";
+          settings.lowLight.noiseReduction = "High";
+          settings.notes.push("Dark scenes: accept softer image in favor of visibility.");
+          break;
+      }
+
+      // Motion adjustments
+      if (motionLevel === "high") {
+        settings.stream.fps = Math.max(settings.stream.fps, 18);
+        if (!lighting || lighting !== "dark") {
+          settings.exposure.shutter = "1/80 to 1/120";
+        }
+        settings.notes.push("High motion: slightly higher FPS and shutter speed to manage blur.");
+      }
+
+      // Bandwidth constraint
+      if (bandwidth && bandwidth > 0) {
+        const limit = Number(bandwidth);
+        if (settings.stream.bitrateMbps > limit) {
+          settings.notes.push(
+            `Requested per-camera bandwidth (${limit} Mbps) is lower than recommended (${settings.stream.bitrateMbps.toFixed(
+              1
+            )} Mbps). Consider lowering FPS or resolution or accept higher bandwidth.`
+          );
+          // clamp bitrate
+          settings.stream.bitrateMbps = limit;
+        }
+      }
+
+      // Retention note only (no full storage calc in the browser… yet)
+      if (retention && retention > 0) {
+        settings.notes.push(
+          `Target retention: ~${retention} days. Verify storage sizing with actual stream stats from VMS after commissioning.`
+        );
+      }
+
+      return settings;
+    }
+
+    function buildInputFromForm() {
+      const getValue = (id) => document.getElementById(id).value.trim();
+
+      const bandwidthStr = getValue("bandwidth");
+      const retentionStr = getValue("retention");
+
+      return {
+        siteName: getValue("site-name") || null,
+        cameraId: getValue("camera-id") || null,
+        cameraModel: getValue("camera-model") || null,
+        vms: getValue("vms") || null,
+        sceneType: getValue("scene-type") || null,
+        purpose: getValue("purpose") || null,
+        lighting: getValue("lighting") || null,
+        motionLevel: getValue("motion-level") || null,
+        bandwidth: bandwidthStr ? Number(bandwidthStr) : null,
+        retention: retentionStr ? Number(retentionStr) : null,
+        notes: getValue("notes") || null,
+        sampleFrameName: frameFileInput.files[0]?.name || null,
+        // NOTE: when you have a backend, send the actual file via FormData instead.
+      };
+    }
+
+    function buildOutputPayload(input, settings) {
+      return {
+        meta: {
+          generator: "CamOpt AI Prototype v0.1",
+          timestamp: new Date().toISOString()
+        },
+        camera: {
+          site: input.siteName,
+          cameraId: input.cameraId,
+          model: input.cameraModel,
+          vms: input.vms,
+          sceneType: input.sceneType,
+          purpose: input.purpose,
+          lighting: input.lighting,
+          motionLevel: input.motionLevel,
+          bandwidthLimitMbps: input.bandwidth,
+          targetRetentionDays: input.retention,
+          integratorNotes: input.notes,
+          sampleFrameName: input.sampleFrameName
+        },
+        recommendedSettings: settings
+      };
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const scene = document.getElementById("scene-type").value;
+      const purpose = document.getElementById("purpose").value;
+      if (!scene || !purpose) {
+        setStatus("error", "Scene type and purpose are required.");
+        showToast("Select scene type and purpose before running.", false);
+        return;
+      }
+
+      setStatus("idle", "Thinking about how badly this camera is probably configured…");
+      runBtn.disabled = true;
+
+      const input = buildInputFromForm();
+
+      // In the future: send 'input' to your backend AI instead.
+      // Example:
+      // fetch("/api/optimize", { method: "POST", body: JSON.stringify(input) ... })
+
+      setTimeout(() => {
+        const settings = basicHeuristicEngine(input);
+        const payload = buildOutputPayload(input, settings);
+
+        resultsEmpty.style.display = "none";
+        resultsPre.style.display = "block";
+        resultsPre.textContent = JSON.stringify(payload, null, 2);
+
+        setStatus("ok", "Recommendations generated. Review and apply.");
+        runBtn.disabled = false;
+      }, 380); // tiny fake delay for UX
+    });
+
+    resetBtn.addEventListener("click", () => {
+      form.reset();
+      fileLabel.textContent = "No file selected";
+      resultsEmpty.style.display = "flex";
+      resultsPre.style.display = "none";
+      resultsPre.textContent = "";
+      setStatus("idle", "Idle — ready to optimize.");
+    });
+
+    copyJsonBtn.addEventListener("click", async () => {
+      const text = resultsPre.textContent.trim();
+      if (!text) {
+        showToast("Nothing to copy yet.", false);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("JSON copied to clipboard.");
+      } catch (err) {
+        console.error(err);
+        showToast("Clipboard failed. Select & copy manually.", false);
+      }
+    });
+  </script>
+</body>
+</html>

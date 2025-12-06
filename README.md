@@ -9,14 +9,14 @@
 ║   ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝        ╚═╝      ╚═╝  ╚═╝╚═╝      ║
 ║                                                                           ║
 ║                   CAMERA SETTINGS OPTIMIZATION SYSTEM                     ║
-║                              Version 0.1                                  ║
+║                              Version 0.2                                  ║
 ║                                                                           ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 CLASSIFICATION: UNCLASSIFIED / INTEGRATOR USE ONLY
 SYSTEM TYPE:    Video Management System Configuration Assistant
 DATE:           2025-CURRENT
-STATUS:         PROTOTYPE - HEURISTIC ENGINE ACTIVE
+STATUS:         TESTING PHASE - CLAUDE VISION AI ACTIVE
 ```
 
 ## MISSION STATEMENT
@@ -47,12 +47,17 @@ The gap between factory defaults and optimal field performance is where 70% of v
 
 ## SOLUTION ARCHITECTURE
 
-CamOpt AI provides integrators with **deterministic starting configurations** based on:
+CamOpt AI provides integrators with **AI-powered configuration recommendations** based on:
 
 - **Scene Classification** (hallway, parking lot, entrance, perimeter, etc.)
 - **Operational Purpose** (overview, face recognition, license plate capture, evidence-grade)
 - **Environmental Factors** (lighting variance, motion levels, contrast extremes)
 - **Resource Constraints** (bandwidth budgets, retention requirements, VMS platform)
+- **Visual Scene Analysis** (optional sample frame upload for Claude Vision analysis)
+
+### AI Integration
+
+Powered by **Anthropic Claude Sonnet 4.5 Vision**, the system analyzes deployment context and optionally reviews sample frames to generate professional-grade camera settings. Falls back to heuristic engine if AI is unavailable.
 
 ### Output Specification
 
@@ -99,22 +104,50 @@ RECOMMENDED SETTINGS PACKAGE
 
 ## DEPLOYMENT INSTRUCTIONS
 
-### Local Operation
+### Quick Start (15 minutes)
 
+See `QUICKSTART.md` for detailed setup instructions.
+
+**Frontend (Retro UI):**
 ```bash
 # Clone the repository
 git clone https://github.com/bneidlinger/cam_whisperer.git
 cd cam_whisperer
 
-# Open in browser (no build process required)
-open index.html
+# Serve frontend
+python -m http.server 3000
+# Open http://localhost:3000
 ```
 
-### Live Deployment
+**Backend (Claude Vision API):**
+```bash
+cd backend
+
+# Setup virtual environment
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env and add your ANTHROPIC_API_KEY
+
+# Start server (Windows)
+.\start.bat
+# Or use: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Backend API will be available at `http://localhost:8000`
+API documentation at `http://localhost:8000/docs`
+
+### Live Deployment (Static Demo)
 
 **SYSTEM ONLINE:** https://bneidlinger.github.io/cam_whisperer/
 
-The application is currently deployed and operational via GitHub Pages in super pre alpha demo. No server-side processing required.
+The frontend is deployed via GitHub Pages. For full AI capabilities, run the backend locally with your Anthropic API key.
 
 ## USAGE PROTOCOL
 
@@ -125,20 +158,27 @@ STEP 1: Input Camera Context
         ├── Scene type selection
         ├── Primary operational purpose
         ├── Lighting/motion characteristics
-        └── Bandwidth and retention constraints
+        ├── Bandwidth and retention constraints
+        └── [OPTIONAL] Upload sample frame for AI analysis
 
 STEP 2: Generate Recommendations
-        └── Execute heuristic engine
+        ├── Claude Vision AI analyzes deployment context
+        ├── Reviews sample frame (if provided)
+        └── Falls back to heuristic engine if AI unavailable
 
 STEP 3: Review Output
         ├── Examine recommended settings
-        ├── Read integrator notes
+        ├── Read AI-generated integrator notes
+        ├── Check confidence score (70-95% typical)
         └── Verify against deployment constraints
 
 STEP 4: Apply to Camera/VMS
         ├── Use settings as initial configuration
         ├── Fine-tune based on live footage review
         └── Document final settings for site records
+
+STEP 5: Track Results (Optional)
+        └── Save API responses to backend/ai_outputs/ for analysis
 ```
 
 ## TECHNICAL SPECIFICATIONS
@@ -148,47 +188,85 @@ STEP 4: Apply to Camera/VMS
 │ APPLICATION STACK                                            │
 ├─────────────────────────────────────────────────────────────┤
 │  Frontend:      Pure HTML5 / CSS3 / JavaScript (ES6+)       │
-│  Dependencies:  None                                         │
-│  Backend:       None (client-side heuristics)                │
-│  Build Process: None required                                │
-│  Runtime:       Modern web browser (Chrome, Firefox, Safari) │
+│  UI Design:     80's Industrial Security Aesthetic          │
+│  Dependencies:  None (frontend is standalone)                │
+│  Backend:       FastAPI + Python 3.11+                       │
+│  AI Engine:     Anthropic Claude Sonnet 4.5 Vision          │
+│  Fallback:      Rule-based heuristic engine                  │
+│  Build Process: None required for frontend                   │
+│  Runtime:       Modern web browser + Python backend          │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ BACKEND ARCHITECTURE                                         │
+├─────────────────────────────────────────────────────────────┤
+│  Framework:     FastAPI (async REST API)                     │
+│  AI Provider:   Anthropic Python SDK                         │
+│  Config:        Pydantic Settings + .env                     │
+│  Image Support: Base64 encoding for Vision API               │
+│  CORS:          Configured for localhost + file://           │
+│  Tracking:      JSON logs + Markdown reports                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## CURRENT LIMITATIONS
+## CURRENT CAPABILITIES (v0.2)
 
 ```
-[!] PROTOTYPE STATUS
-    └── Current engine uses rule-based heuristics, not AI inference
+[✓] CLAUDE VISION AI INTEGRATION
+    └── Real-time analysis of deployment context and sample frames
 
-[!] NO BACKEND INTEGRATION
-    └── Placeholder for future AI model integration (see index.html:838-840)
+[✓] BACKEND API SERVER
+    └── FastAPI with async optimization endpoint
 
-[!] NO IMAGE ANALYSIS
-    └── Sample frame upload UI present but not processed
+[✓] IMAGE ANALYSIS
+    └── Base64 sample frame upload processed by Claude Vision
+
+[✓] HEURISTIC FALLBACK
+    └── Automatic degradation to rule-based engine if AI unavailable
+
+[✓] TEST TRACKING SYSTEM
+    └── Logs all optimization requests with confidence scores
+
+[✓] RETRO INDUSTRIAL UI
+    └── 80's security aesthetic with CRT effects and terminal output
+```
+
+## REMAINING LIMITATIONS
+
+```
+[!] TESTING PHASE
+    └── System under active testing, not production-ready
+
+[!] NO DIRECT VMS INTEGRATION
+    └── Settings must be manually applied to cameras
 
 [!] NO STORAGE CALCULATOR
-    └── Retention targets noted but not validated against actual capacity
+    └── Retention targets noted but not validated against capacity
+
+[!] NO CAMERA DISCOVERY
+    └── Manual input of camera context required
 ```
 
-## FUTURE ROADMAP
+## ROADMAP
 
 ```
-PHASE 2: AI MODEL INTEGRATION
-         └── Replace heuristic engine with trained model
-         └── Backend API for inference
-         └── Sample frame analysis for scene validation
+PHASE 2: ✓ COMPLETED (v0.2)
+         ✓ Claude Vision AI integration
+         ✓ Backend API server
+         ✓ Sample frame analysis
+         ✓ Test tracking system
 
-PHASE 3: ADVANCED FEATURES
-         └── Multi-camera site optimization
-         └── Storage capacity calculator
+PHASE 3: IN PROGRESS
+         ├── Database integration for settings history
+         ├── Multi-camera site optimization
+         ├── Storage capacity calculator
          └── VMS-specific export formats
-         └── Historical tuning data analysis
 
-PHASE 4: FIELD VALIDATION
-         └── Integration with actual VMS platforms
-         └── A/B testing framework
-         └── Feedback loop from deployed cameras
+PHASE 4: PLANNED
+         ├── Direct VMS API integration (Genetec, Milestone, ACC)
+         ├── Camera discovery via ONVIF
+         ├── Automated settings application
+         └── Performance monitoring & feedback loop
 ```
 
 ## PHILOSOPHICAL FOUNDATION
@@ -231,12 +309,21 @@ CamOpt AI is the first step toward **universal camera optimization** - where eve
 ## CONTACT
 
 ```
-REPOSITORY: https://github.com/bneidlinger/cam_whisperer
-ISSUES:     https://github.com/bneidlinger/cam_whisperer/issues
-LIVE DEMO:  https://bneidlinger.github.io/cam_whisperer/
+REPOSITORY:  https://github.com/bneidlinger/cam_whisperer
+ISSUES:      https://github.com/bneidlinger/cam_whisperer/issues
+LIVE DEMO:   https://bneidlinger.github.io/cam_whisperer/
+DOCS:        See backend/README.md for API documentation
 ```
 
 For issues, feature requests, or integration questions, file a report via GitHub Issues.
+
+### Additional Documentation
+
+- `QUICKSTART.md` - 15-minute setup guide
+- `backend/README.md` - Backend development guide
+- `backend/ARCHITECTURE.md` - System architecture diagrams
+- `backend/API_SPECIFICATION.md` - Complete API reference
+- `backend/ai_outputs/README.md` - Test tracking workflow
 
 ---
 
