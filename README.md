@@ -1,12 +1,12 @@
 ```
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                                                                           ║
-║   ██████╗ █████╗ ███╗   ███╗ ██████╗ ██████╗ ████████╗    █████╗ ██╗    ║
-║  ██╔════╝██╔══██╗████╗ ████║██╔═══██╗██╔══██╗╚══██╔══╝   ██╔══██╗██║    ║
-║  ██║     ███████║██╔████╔██║██║   ██║██████╔╝   ██║      ███████║██║    ║
-║  ██║     ██╔══██║██║╚██╔╝██║██║   ██║██╔═══╝    ██║      ██╔══██║██║    ║
-║  ╚██████╗██║  ██║██║ ╚═╝ ██║╚██████╔╝██║        ██║      ██║  ██║██║    ║
-║   ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝        ╚═╝      ╚═╝  ╚═╝╚═╝    ║
+║   ██████╗ █████╗ ███╗   ███╗ ██████╗ ██████╗ ████████╗    █████╗ ██╗      ║
+║  ██╔════╝██╔══██╗████╗ ████║██╔═══██╗██╔══██╗╚══██╔══╝   ██╔══██╗██║      ║
+║  ██║     ███████║██╔████╔██║██║   ██║██████╔╝   ██║      ███████║██║      ║
+║  ██║     ██╔══██║██║╚██╔╝██║██║   ██║██╔═══╝    ██║      ██╔══██║██║      ║
+║  ╚██████╗██║  ██║██║ ╚═╝ ██║╚██████╔╝██║        ██║      ██║  ██║██║      ║
+║   ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝        ╚═╝      ╚═╝  ╚═╝╚═╝      ║
 ║                                                                           ║
 ║                   CAMERA SETTINGS OPTIMIZATION SYSTEM                     ║
 ║                              Version 0.1                                  ║
@@ -15,7 +15,7 @@
 
 CLASSIFICATION: UNCLASSIFIED / INTEGRATOR USE ONLY
 SYSTEM TYPE:    Video Management System Configuration Assistant
-DATE:           2024-CURRENT
+DATE:           2025-CURRENT
 STATUS:         PROTOTYPE - HEURISTIC ENGINE ACTIVE
 ```
 
@@ -114,7 +114,7 @@ open index.html
 
 **SYSTEM ONLINE:** https://bneidlinger.github.io/cam_whisperer/
 
-The application is currently deployed and operational via GitHub Pages. No server-side processing required.
+The application is currently deployed and operational via GitHub Pages in super pre alpha demo. No server-side processing required.
 
 ## USAGE PROTOCOL
 

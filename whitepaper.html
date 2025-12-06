@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CamOpt AI – System Workflow & Architecture Overview</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --paper: #ffffff;
+      --ink: #111827;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --accent-soft: #e0ecff;
+      --border: #e5e7eb;
+      --code-bg: #0b1020;
+      --code-fg: #e5e7ff;
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #e5ebff, #f5f5f7 58%);
+      color: var(--ink);
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .page {
+      max-width: 980px;
+      width: 100%;
+      background: var(--paper);
+      border-radius: 16px;
+      box-shadow:
+        0 18px 45px rgba(15,23,42,0.12),
+        0 0 0 1px rgba(15,23,42,0.02);
+      padding: 32px 30px 40px;
+    }
+
+    @media (max-width: 768px) {
+      .page {
+        padding: 20px 18px 28px;
+      }
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .eyebrow {
+      font-size: 0.76rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin: 0 0 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: var(--muted);
+      max-width: 640px;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .tag {
+      border-radius: 999px;
+      padding: 3px 9px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.4fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 920px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .section {
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      margin: 0 0 10px;
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin: 18px 0 6px;
+    }
+
+    p {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      margin: 0 0 8px;
+      color: #1f2933;
+    }
+
+    ul, ol {
+      margin: 6px 0 10px 20px;
+      padding: 0;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    li + li {
+      margin-top: 4px;
+    }
+
+    .callout {
+      border-radius: var(--radius);
+      border: 1px solid var(--accent-soft);
+      background: #f8fbff;
+      padding: 10px 12px;
+      font-size: 0.86rem;
+      color: #1f2937;
+      margin-top: 4px;
+    }
+
+    .diagram {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      padding: 12px 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.78rem;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 10px 0 12px;
+      color: #111827;
+    }
+
+    .side-card {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      padding: 12px 13px;
+      margin-bottom: 12px;
+    }
+
+    .side-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .side-body {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.74rem;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: #4b5563;
+    }
+
+    .code-block {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.78rem;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 8px 0 12px;
+    }
+
+    .footnote {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 18px;
+      border-top: 1px dashed var(--border);
+      padding-top: 10px;
+    }
+
+    strong {
+      font-weight: 600;
+    }
+
+    .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    .quote {
+      border-left: 3px solid var(--border);
+      padding-left: 10px;
+      margin: 10px 0;
+      font-size: 0.86rem;
+      color: #4b5563;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="eyebrow">Technical Overview</div>
+      <h1>CamOpt AI – Automated Surveillance Camera Optimization</h1>
+      <p class="subtitle">
+        This document describes the end-to-end workflow, system architecture, and AI integration model
+        for an application that discovers surveillance cameras, recommends optimal settings, applies
+        those changes via VMS or camera APIs, and continually monitors performance over time.
+      </p>
+      <div class="meta-row">
+        <span class="tag">Draft v0.1</span>
+        <span class="tag">Internal Architecture / Whitepaper</span>
+        <span class="tag">Scope: IP Cameras + VMS Integration</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- MAIN NARRATIVE -->
+      <div>
+        <!-- 1. High-Level Concept -->
+        <section class="section">
+          <h2>1. High-Level Concept</h2>
+          <p>
+            Most deployed surveillance cameras are misconfigured: bitrates are too high, shutter speeds are
+            too slow for motion, WDR is disabled at entrances, and low-light behavior is left at defaults.
+            The result is poor evidence quality, oversized storage usage, and endless manual tweaking.
+          </p>
+          <p>
+            <strong>CamOpt AI</strong> is designed as an orchestration layer on top of existing cameras and VMS platforms.
+            It does not replace the VMS. Instead, it:
+          </p>
+          <ul>
+            <li>Discovers cameras and their capabilities on the network.</li>
+            <li>Reads current settings and a live sample frame.</li>
+            <li>Calls an AI engine to propose optimized settings for a specific purpose.</li>
+            <li>Applies the configuration via VMS SDKs or camera APIs.</li>
+            <li>Continuously monitors quality and adjusts or alerts when conditions drift.</li>
+          </ul>
+
+          <div class="diagram">
++-------------------------+        +-------------------------+
+|  Network & VMS Layer    |        |      AI Layer           |
+|                         |        |                         |
+|  - IP Cameras           |        |  - LLM / Vision models  |
+|  - VMS (ACC, Genetec)   |&lt;------&gt;|  - Heuristic rules       |
+|  - NVR / Recording      |        |  - Policy constraints   |
++-------------------------+        +-------------------------+
+              ^                               ^
+              |                               |
+              +-----------+   +---------------+
+                          |   |
+                   +-------------+
+                   | CamOpt App  |
+                   | (Backend +  |
+                   |  Web UI)    |
+                   +-------------+
+          </div>
+
+          <p class="callout">
+            In short: the app behaves like a dedicated “camera tuning engineer” that never gets tired,
+            never forgets to enable WDR, and can keep thousands of cameras within defined quality and
+            retention targets.
+          </p>
+        </section>
+
+        <!-- 2. End-to-End Workflow -->
+        <section class="section">
+          <h2>2. End-to-End Workflow</h2>
+
+          <h3>2.1 Discovery Phase</h3>
+          <p>
+            The system begins by building an inventory of cameras and their relationship to any VMS or NVR.
+          </p>
+          <ol>
+            <li>
+              <strong>Network scan:</strong> Use ONVIF discovery, known subnets, and/or nmap-style probing
+              to identify IP cameras.
+            </li>
+            <li>
+              <strong>VMS integration:</strong> Query VMS APIs (for example, ACC, Genetec, Milestone) to map:
+              camera UUID → IP address → logical name / role / location.
+            </li>
+            <li>
+              <strong>Camera profiles:</strong> For each camera, the app builds a <em>CameraRecord</em> object
+              containing site, location, model, VMS IDs, and intended purpose (overview, face ID, LPR, etc.).
+            </li>
+          </ol>
+
+          <div class="diagram">
+[Admin]  ── defines site &amp; purpose ──────┐
+                                           v
+Network Scan / VMS Query  ──&gt;  Camera Inventory (JSON)
+          </div>
+
+          <h3>2.2 Capability & Settings Ingest</h3>
+          <p>
+            After discovery, the app queries each camera for both what it can do and how it is currently configured.
+          </p>
+          <ul>
+            <li><strong>Capabilities:</strong> max resolution, supported codecs, FPS range, WDR levels, IR modes, etc.</li>
+            <li><strong>Current settings:</strong> encoding, FPS, bitrate, shutter, WDR, IR behavior, noise reduction, etc.</li>
+            <li><strong>Sample frame:</strong> a still image snapshot to capture real-world lighting and scene composition.</li>
+          </ul>
+
+          <div class="code-block">
+{
+  "camera": {
+    "id": "L1-HALL-104",
+    "ip": "10.10.21.104",
+    "model": "QNV-7080R",
+    "vmsSystem": "Genetec"
+  },
+  "capabilities": {
+    "maxResolution": "3840x2160",
+    "supportedCodecs": ["H.264", "H.265"],
+    "maxFps": 30,
+    "wdrLevels": ["Off","Low","Medium","High"]
+  },
+  "currentSettings": {
+    "stream": { "resolution": "1920x1080", "codec": "H.264", "fps": 30, "bitrateMbps": 6 },
+    "exposure": { "shutter": "1/30", "wdr": "Off" },
+    "lowLight": { "irMode": "Auto" }
+  },
+  "context": {
+    "targetRetentionDays": 30,
+    "bandwidthLimitMbps": 4,
+    "sampleFrame": "data:image/jpeg;base64,..."
+  }
+}
+          </div>
+
+          <h3>2.3 AI Optimization Phase</h3>
+          <p>
+            The core of the system is the optimization step, where the app calls an AI engine to generate
+            recommended camera settings.
+          </p>
+          <ol>
+            <li>
+              Construct an <strong>OptimizeRequest</strong> object from the collected data.
+            </li>
+            <li>
+              Send the request to the AI backend (LLM + rules + policies) via a REST API.
+            </li>
+            <li>
+              Receive an <strong>OptimizeResponse</strong> containing:
+              <ul>
+                <li>Recommended settings (stream, exposure, low-light, image).</li>
+                <li>Warnings (retention mismatches, bandwidth constraints, hardware limits).</li>
+                <li>Explanation text for auditability.</li>
+              </ul>
+            </li>
+          </ol>
+
+          <div class="quote">
+            Design goal: an experienced security technician should read the explanation and nod along.
+            The AI is not a black box; it just automates the reasoning they would normally perform by hand.
+          </div>
+
+          <h3>2.4 Review & Application Phase</h3>
+          <p>
+            The recommended configuration is surfaced in the CamOpt web UI, where a human can review and approve.
+          </p>
+          <ul>
+            <li>
+              The app presents <strong>before vs after</strong> settings, along with the sample frame and a
+              short explanation of key changes (for example, “increasing shutter speed to reduce motion blur on faces”).
+            </li>
+            <li>
+              The user can:
+              <ul>
+                <li>Accept the full profile.</li>
+                <li>Override specific values (e.g., keep FPS but lower bitrate).</li>
+                <li>Flag the camera as “do not auto-tune” for special cases.</li>
+              </ul>
+            </li>
+          </ul>
+
+          <p>
+            Once confirmed, the app applies changes via one of two paths:
+          </p>
+          <ol>
+            <li>
+              <strong>VMS path:</strong> use the VMS SDK/API to update stream presets, recording profiles, or
+              camera configuration templates.
+            </li>
+            <li>
+              <strong>Direct camera path:</strong> use vendor HTTP APIs or ONVIF set-config calls when a camera
+              is not under VMS control or where more granular control is required.
+            </li>
+          </ol>
+
+          <div class="diagram">
+[User] ── reviews &amp; approves ──┐
+                                 v
+                    +---------------------------+
+                    |  CamOpt Apply Service     |
+                    +---------------------------+
+                        |                  |
+                via VMS |                  | via Camera
+                        v                  v
+                +-----------+       +-------------+
+                |  VMS SDK  |       |  ONVIF /    |
+                | (ACC etc) |       |  Vendor API |
+                +-----------+       +-------------+
+          </div>
+        </section>
+
+        <!-- 3. Continuous Monitoring -->
+        <section class="section">
+          <h2>3. Continuous Monitoring & Feedback Loop</h2>
+
+          <h3>3.1 Passive Monitoring Mode</h3>
+          <p>
+            After initial tuning, the system enters a passive monitoring mode. It does not constantly change
+            settings; instead, it watches for signals that indicate the camera is no longer performing as expected.
+          </p>
+          <ul>
+            <li>Periodic snapshot capture (for example every 15–60 minutes).</li>
+            <li>Pulling VMS statistics such as bitrate, frame drops, or recording errors.</li>
+            <li>Sampling motion levels and event counts to see if the scene behavior changed.</li>
+          </ul>
+
+          <h3>3.2 Health Signals & Triggers</h3>
+          <p>
+            The monitoring service computes simple quality indicators for each camera:
+          </p>
+          <ul>
+            <li><strong>Exposure health:</strong> frames are consistently too bright or too dark.</li>
+            <li><strong>Noise level:</strong> strong high-ISO noise in low-light scenes.</li>
+            <li><strong>Motion blur:</strong> streaked subjects in high-motion environments.</li>
+            <li><strong>Bandwidth drift:</strong> actual bitrate is far above or below the expected range.</li>
+          </ul>
+
+          <p>
+            When thresholds are violated, the app triggers one of three actions:
+          </p>
+          <ol>
+            <li>
+              <strong>Soft recommendation:</strong> queue a new AI optimization suggestion for review.
+            </li>
+            <li>
+              <strong>Alert only:</strong> notify the operator that the camera has degraded quality (for example, lens obstruction or mis-aim).
+            </li>
+            <li>
+              <strong>Policy-based auto-adjust:</strong> for approved low-risk changes (like minor bitrate tuning), the app can auto-apply within pre-defined bounds.
+            </li>
+          </ol>
+
+          <h3>3.3 Closed Feedback Loop</h3>
+          <p>
+            Over time, each optimization episode becomes training data:
+          </p>
+          <ul>
+            <li>The system logs inputs (scene, hardware, constraints) and outputs (final accepted settings).</li>
+            <li>Accepted vs rejected recommendations are tracked.</li>
+            <li>Future model versions can be fine-tuned using real-world outcomes from diverse environments.</li>
+          </ul>
+
+          <div class="diagram">
+Camera State ──&gt; AI Suggestion ──&gt; Human Decision ──&gt; Applied Settings
+     ^                                                        |
+     |                                                        v
+     +--------------------- Monitoring & Metrics &lt;------------+
+          </div>
+        </section>
+
+        <!-- 4. AI Role -->
+        <section class="section">
+          <h2>4. Role of AI vs. Deterministic Logic</h2>
+          <p>
+            The system deliberately combines deterministic rules with AI reasoning:
+          </p>
+          <ul>
+            <li>
+              <strong>Rules:</strong> enforce hard constraints such as minimum shutter speed for LPR,
+              maximum allowed bitrate per camera, or vendor-specific limits.
+            </li>
+            <li>
+              <strong>AI (LLM + Vision):</strong> interprets the scene (for example, indoor hallway vs. entrance
+              with glass), balances trade-offs (noise vs motion blur), and explains recommendations in
+              human-readable language.
+            </li>
+          </ul>
+
+          <p class="callout">
+            The AI is not acting as a black-box “auto everything” switch. It is a guided assistant, constrained
+            by policies and safety rules, that automates the same reasoning a competent security engineer
+            would apply when tuning cameras manually.
+          </p>
+        </section>
+
+        <!-- 5. Integration Surfaces -->
+        <section class="section">
+          <h2>5. Integration Surfaces</h2>
+          <h3>5.1 Web UI</h3>
+          <p>
+            The web front-end provides operators with:
+          </p>
+          <ul>
+            <li>Camera inventory and status overview.</li>
+            <li>Per-camera optimization console (current vs recommended settings).</li>
+            <li>Batch operations for entire sites or roles (for example, “all exterior entrances”).</li>
+            <li>Historical change log and explanations for audit and compliance.</li>
+          </ul>
+
+          <h3>5.2 API Layer</h3>
+          <p>
+            The backend exposes a REST API that other tools or scripts can call:
+          </p>
+          <ul>
+            <li><code>POST /api/optimize</code> – run optimization for a camera context.</li>
+            <li><code>POST /api/apply</code> – apply an accepted configuration.</li>
+            <li><code>GET /api/discover</code> – return discovered cameras and metadata.</li>
+            <li><code>POST /api/monitor/tick</code> – run a monitoring cycle (cron-friendly).</li>
+          </ul>
+
+          <h3>5.3 VMS & Vendor SDKs</h3>
+          <p>
+            Vendor-specific adapters implement the actual “make it real” steps:
+          </p>
+          <ul>
+            <li>ACC: profiles, recording rules, stream configurations.</li>
+            <li>Genetec: cameras, roles, recording schedules.</li>
+            <li>Milestone / others: similar concepts mapped via per-platform plugins.</li>
+            <li>ONVIF / HTTP: fallback path for non-VMS or edge-only deployments.</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- SIDE PANEL / EXECUTIVE SNAPSHOT -->
+      <aside>
+        <div class="side-card">
+          <div class="side-title">System Goals</div>
+          <div class="side-body">
+            <ul>
+              <li>Reduce manual camera tuning time.</li>
+              <li>Improve evidence quality at critical views.</li>
+              <li>Keep bitrate &amp; retention within budget.</li>
+              <li>Provide audit-friendly explanations.</li>
+            </ul>
+          </div>
+          <div class="pill-row">
+            <span class="pill">Evidence quality</span>
+            <span class="pill">Bandwidth control</span>
+            <span class="pill">Ops efficiency</span>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <div class="side-title">Key Data Objects</div>
+          <div class="side-body">
+            <ul>
+              <li><strong>CameraRecord</strong> – where/what is this camera.</li>
+              <li><strong>CameraCapabilities</strong> – what it can do.</li>
+              <li><strong>CameraCurrentSettings</strong> – how it is configured now.</li>
+              <li><strong>OptimizeRequest/Response</strong> – AI boundary.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <div class="side-title">Lifecycle Stages</div>
+          <ol style="font-size:0.84rem; color:var(--muted); margin-top:4px;">
+            <li>Discover &amp; map cameras.</li>
+            <li>Ingest settings &amp; capabilities.</li>
+            <li>AI optimization.</li>
+            <li>Human review &amp; apply.</li>
+            <li>Passive monitoring.</li>
+            <li>Periodic re-tune as needed.</li>
+          </ol>
+        </div>
+
+        <div class="side-card">
+          <div class="side-title">Future Enhancements</div>
+          <div class="side-body">
+            <ul>
+              <li>Per-vendor tuning playbooks learned from fleet data.</li>
+              <li>Dynamic profiles based on schedule (day/night/peak hours).</li>
+              <li>Deeper analytics: face/plate readability scoring.</li>
+              <li>Customer-specific policy templates (for example, retail vs data center).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <div class="label">Implementation Note</div>
+          <div class="side-body">
+            Backend can start with heuristic rules and later route OptimizeRequest objects to one or
+            more AI providers (LLMs and/or vision models). The contract at the API boundary stays
+            stable while the intelligence behind it evolves.
+          </div>
+        </div>
+
+        <div class="footnote">
+          HK-47 style translation: “App scans, judges, and quietly corrects thousands of poorly
+          configured cameras while the organics focus on higher-level decisions.”  
+          Rick-style translation: “You’re basically building the camera settings autocorrect that
+          every VMS should’ve had a decade ago.”
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>
