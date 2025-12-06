@@ -4,155 +4,132 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**CamOpt AI** is a single-page web application (prototype v0.1) that generates optimal camera settings recommendations for surveillance/VMS (Video Management System) deployments. It's designed for security integrators to quickly determine ideal camera configurations based on scene type, lighting conditions, and operational requirements.
-
-The entire application is contained in a single `index.html` file with embedded CSS and JavaScript - no build process, dependencies, or backend required.
+**CamOpt AI** (v0.2) is a camera settings optimization system for surveillance/VMS deployments. It generates optimal camera configurations based on scene type, lighting, and operational requirements using Claude Vision AI with heuristic fallback.
 
 ## Architecture
 
-### Application Structure
-
-This is a **static web application** with no external dependencies:
-- **No build process** - open `index.html` directly in a browser
-- **No package manager** - no npm, yarn, or similar
-- **No backend** - currently uses client-side heuristic rules (placeholder for future AI integration)
-- **No frameworks** - vanilla HTML/CSS/JavaScript
-
-The `.nojekyll` file indicates this is deployed to GitHub Pages.
-
-### Core Components (all in index.html)
-
-1. **Form Interface (Left Panel)** - Collects camera deployment context:
-   - Site/camera identification
-   - Scene type (hallway, parking lot, entrance, etc.)
-   - Purpose (overview, face recognition, license plates, etc.)
-   - Environmental factors (lighting, motion level)
-   - Constraints (bandwidth budget, retention requirements)
-   - Optional sample frame upload
-
-2. **Results Panel (Right Panel)** - Displays generated recommendations as JSON:
-   - Stream settings (resolution, codec, FPS, bitrate)
-   - Exposure settings (shutter, WDR, backlight compensation)
-   - Low-light settings (IR mode, noise reduction)
-   - Image processing (sharpening, contrast)
-   - Recording parameters
-   - Context-specific notes and warnings
-
-3. **Recommendation Engine** (`basicHeuristicEngine` function):
-   - Currently uses rule-based heuristics
-   - Adjusts settings based on scene type, purpose, lighting, and motion
-   - Handles constraint violations (bandwidth limits)
-   - Generates human-readable notes for integrators
-   - **TODO**: Replace with actual AI/backend API integration (see line 838-840)
-
-### Key Functions
-
-- `basicHeuristicEngine(input)` (line 597-773): Core logic that generates camera settings based on form inputs
-- `buildInputFromForm()` (line 775-796): Extracts and normalizes form data
-- `buildOutputPayload(input, settings)` (line 798-820): Constructs final JSON output with metadata
-- `setStatus(mode, message)` (line 580-586): Updates UI status indicator
-- `showToast(message, ok)` (line 588-595): Displays temporary notification
-
-## Development Workflow
-
-### Running Locally
-
-Simply open `index.html` in a web browser:
-```bash
-# On Windows
-start index.html
-
-# On macOS
-open index.html
-
-# On Linux
-xdg-open index.html
+```
+┌─────────────────────┐     ┌─────────────────────────────────┐
+│  Frontend (Static)  │────▶│  Backend (FastAPI + Python)     │
+│  index.html         │     │  backend/main.py                │
+│  - Form UI          │     │  - Claude Vision AI integration │
+│  - Results display  │     │  - ONVIF camera discovery       │
+│  - Retro aesthetic  │     │  - Heuristic fallback engine    │
+└─────────────────────┘     │  - Hanwha WAVE VMS support      │
+                            └─────────────────────────────────┘
 ```
 
-Or use a simple HTTP server if needed:
-```bash
-# Python 3
-python -m http.server 8000
+### Frontend
+- Single `index.html` with embedded CSS/JavaScript (vanilla, no frameworks)
+- Deployed via GitHub Pages
+- Contains fallback heuristic engine (`basicHeuristicEngine` function)
 
-# Python 2
-python -m SimpleHTTPServer 8000
+### Backend (`backend/`)
+- **Framework**: FastAPI (Python 3.10+)
+- **AI**: Anthropic Claude Sonnet 4.5 Vision
+- **Camera Integration**: ONVIF protocol, Hanwha WAVE VMS API
+
+Key backend files:
+- `main.py` - FastAPI app, all API endpoints
+- `config.py` - Pydantic settings from `.env`
+- `services/optimization.py` - Claude AI integration + heuristic fallback
+- `services/discovery.py` - ONVIF and WAVE camera discovery
+- `services/apply.py` - Apply settings via ONVIF/VMS
+
+## Development Commands
+
+### Frontend (no build)
+```bash
+# Open directly
+start index.html  # Windows
+open index.html   # macOS
+
+# Or serve with Python
+python -m http.server 3000
+```
+
+### Backend
+```bash
+cd backend
+
+# Setup (first time)
+python -m venv venv
+venv\Scripts\activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env   # Edit and add ANTHROPIC_API_KEY
+
+# Run development server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Run tests
+pytest
+pytest tests/test_optimization.py  # Single file
+
+# Code formatting
+black .
+ruff check .
 ```
 
 ### Deployment
+Frontend: Push to `main` branch (GitHub Pages auto-deploys)
+Backend: See `backend/README.md` for Render/Railway deployment
 
-This is a GitHub Pages site. Push to the `main` branch to deploy:
-```bash
-git add .
-git commit -m "Update application"
-git push origin main
-```
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/optimize` | POST | Generate optimal settings (AI + fallback) |
+| `/api/discover` | GET | ONVIF camera discovery |
+| `/api/cameras/{id}/capabilities` | GET | Query camera capabilities |
+| `/api/apply` | POST | Apply settings via ONVIF/VMS |
+| `/api/wave/discover` | GET | Hanwha WAVE VMS discovery |
+
+API docs: `http://localhost:8000/docs` (Swagger UI)
 
 ## Code Modification Guidelines
 
-### Adding New Scene Types
+### Adding Scene Types
+1. Add option to `#scene-type` select in `index.html`
+2. Add case in `basicHeuristicEngine` (frontend) and `services/optimization.py` (backend)
 
-1. Add option to the `#scene-type` select element (line 427-436)
-2. Add corresponding case in `basicHeuristicEngine` switch statement (line 646-687)
-3. Define appropriate default settings for that scene type
+### Adding Purposes
+1. Add option to `#purpose` select in `index.html`
+2. Add case in purpose switch in both heuristic engines
 
-### Adding New Purposes
+### Modifying AI Prompt
+Edit the prompt template in `services/optimization.py` (`_build_optimization_prompt` method)
 
-1. Add option to the `#purpose` select element (line 440-447)
-2. Add corresponding case in purpose switch statement (line 690-718)
-3. Adjust FPS, bitrate, shutter speed, and add relevant notes
+### Adding VMS Integration
+1. Add client in `services/discovery.py` for camera discovery
+2. Add adapter in `services/apply.py` for settings application
+3. Add endpoints in `main.py`
 
-### Modifying Recommendation Logic
+## Environment Variables
 
-The core logic is in `basicHeuristicEngine()` (line 597-773). Settings are adjusted in this order:
-1. Initialize with baseline defaults
-2. Apply scene-type adjustments
-3. Apply purpose adjustments
-4. Apply lighting adjustments
-5. Apply motion-level adjustments
-6. Enforce bandwidth constraints
-7. Add retention notes
-
-### Future AI Integration
-
-The placeholder for backend integration is at line 838-840. To connect to an AI backend:
-```javascript
-const response = await fetch("/api/optimize", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(input)
-});
-const { settings } = await response.json();
+Required in `backend/.env`:
+```
+ANTHROPIC_API_KEY=sk-ant-...  # Required for AI
 ```
 
-## Domain-Specific Context
+Optional:
+```
+APP_ENV=development
+CLAUDE_MODEL=claude-sonnet-4-5-20250929
+FALLBACK_TO_HEURISTIC=true
+DATABASE_URL=sqlite:///./camopt.db
+CORS_ORIGINS=http://localhost:3000
+```
 
-### Surveillance Camera Settings
+## Domain Context
 
-- **WDR (Wide Dynamic Range)**: Handles high-contrast scenes (bright windows in dark rooms)
-- **IR (Infrared)**: Night vision illumination
-- **Shutter Speed**: Faster (1/250-1/500) prevents motion blur but requires more light
-- **Bitrate**: Higher quality requires more bandwidth and storage
-- **H.265 vs H.264**: H.265 offers ~50% better compression but requires more processing
-- **FPS (Frames Per Second)**: Higher is better for fast motion but increases bandwidth
+### Camera Settings
+- **WDR**: Handles high-contrast scenes (bright windows)
+- **IR**: Night vision illumination
+- **Shutter Speed**: 1/250-1/500 prevents blur but needs more light
+- **H.265 vs H.264**: H.265 offers ~50% better compression
 
-### VMS Platforms
-
-Supported platforms (line 413-420):
-- Avigilon ACC
-- Genetec Security Center
-- Milestone XProtect
-- Exacq
-- Hanwha WAVE
-
-### Typical Trade-offs
-
-The engine balances:
-1. **Image quality vs storage** - higher bitrate = better quality but more storage
-2. **Motion clarity vs low-light performance** - fast shutter reduces blur but needs more light
-3. **Bandwidth vs retention** - must fit within network and storage constraints
-4. **Detail vs coverage** - face/plate recognition needs higher FPS and faster shutter
-
-## File References
-
-- Main application: `index.html` (single file containing everything)
-- Deployment marker: `.nojekyll` (GitHub Pages configuration)
+### Trade-offs the Engine Balances
+1. Image quality vs storage (bitrate)
+2. Motion clarity vs low-light (shutter speed)
+3. Bandwidth vs retention
+4. Detail vs coverage (FPS, resolution)

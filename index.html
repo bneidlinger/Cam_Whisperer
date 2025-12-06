@@ -18,11 +18,14 @@
       --orange-border: #2a1a0f;
       --green-terminal: #00ff41;
       --amber-warning: #ffaa00;
+      --red-alert: #ff4444;
+      --blue-info: #00d4ff;
       --grid-line: #1a1a1a;
       --text-primary: #e8e8e8;
       --text-dim: #888888;
       --text-orange: #ff8c42;
       --scan-line: rgba(255, 107, 26, 0.03);
+      --sidebar-width: 200px;
     }
 
     * {
@@ -36,7 +39,6 @@
       background: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
-      padding: 20px;
       position: relative;
       overflow-x: hidden;
     }
@@ -72,9 +74,11 @@
       z-index: 0;
     }
 
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
+    /* Main Layout */
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
       position: relative;
       z-index: 1;
     }
@@ -82,14 +86,15 @@
     /* Terminal Header */
     .terminal-header {
       background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-secondary) 100%);
-      border: 2px solid var(--orange-dark);
       border-bottom: 3px solid var(--orange-primary);
       padding: 12px 20px;
-      margin-bottom: 20px;
       position: relative;
       box-shadow:
         0 0 20px rgba(255, 107, 26, 0.3),
         inset 0 1px 0 rgba(255, 140, 66, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .terminal-header::before {
@@ -131,25 +136,111 @@
       50% { opacity: 0.6; }
     }
 
-    .subtitle {
+    .header-stats {
+      display: flex;
+      gap: 20px;
       font-size: 0.75rem;
       color: var(--text-dim);
+    }
+
+    .header-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-stat-value {
+      color: var(--orange-glow);
+    }
+
+    /* Main Content Area */
+    .main-content {
+      display: flex;
+      flex: 1;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-panel);
+      border-right: 2px solid var(--orange-dark);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 10px 0;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+      color: var(--text-dim);
       text-transform: uppercase;
+      font-size: 0.8rem;
       letter-spacing: 0.1em;
-      margin-top: 4px;
     }
 
-    /* Main Grid */
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 20px;
+    .nav-item:hover {
+      background: rgba(255, 107, 26, 0.1);
+      color: var(--text-primary);
     }
 
-    @media (max-width: 1000px) {
-      .main-grid {
-        grid-template-columns: 1fr;
-      }
+    .nav-item.active {
+      background: rgba(255, 107, 26, 0.15);
+      border-left-color: var(--orange-primary);
+      color: var(--orange-glow);
+      box-shadow: inset 0 0 20px rgba(255, 107, 26, 0.1);
+    }
+
+    .nav-icon {
+      font-size: 1.2rem;
+      width: 24px;
+      text-align: center;
+    }
+
+    .nav-label {
+      flex: 1;
+    }
+
+    .nav-badge {
+      background: var(--orange-dark);
+      color: var(--text-primary);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.65rem;
+    }
+
+    .sidebar-footer {
+      padding: 15px;
+      border-top: 1px solid var(--orange-dark);
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      max-height: calc(100vh - 70px);
+    }
+
+    /* Section Containers */
+    .section {
+      display: none;
+    }
+
+    .section.active {
+      display: block;
     }
 
     /* Panel Styling */
@@ -160,6 +251,7 @@
       box-shadow:
         0 4px 20px rgba(0, 0, 0, 0.7),
         inset 0 1px 0 rgba(255, 107, 26, 0.1);
+      margin-bottom: 20px;
     }
 
     .panel::before {
@@ -198,13 +290,50 @@
     }
 
     .panel-title::before {
-      content: "▶";
+      content: ">";
       color: var(--orange-primary);
       font-size: 0.7rem;
     }
 
     .panel-body {
       padding: 20px;
+    }
+
+    /* Sub-tabs */
+    .sub-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--orange-dark);
+      background: var(--bg-secondary);
+    }
+
+    .sub-tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .sub-tab:hover {
+      color: var(--text-primary);
+      background: rgba(255, 107, 26, 0.05);
+    }
+
+    .sub-tab.active {
+      color: var(--orange-glow);
+      border-bottom-color: var(--orange-primary);
+      background: rgba(255, 107, 26, 0.1);
+    }
+
+    .sub-content {
+      display: none;
+    }
+
+    .sub-content.active {
+      display: block;
     }
 
     /* Form Styling */
@@ -265,6 +394,12 @@
       color: #444;
     }
 
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
     /* Button Styling */
     .btn {
       background: linear-gradient(180deg, var(--orange-primary) 0%, var(--orange-dark) 100%);
@@ -310,6 +445,22 @@
       transform: none;
     }
 
+    .btn-secondary {
+      background: linear-gradient(180deg, #333 0%, #222 100%);
+      color: var(--text-primary);
+      border-color: #444;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    .btn-secondary:hover {
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+    }
+
     /* Status Badge */
     .status-badge {
       display: inline-flex;
@@ -335,8 +486,8 @@
     }
 
     .status-badge.error {
-      border-color: #ff4444;
-      color: #ff4444;
+      border-color: var(--red-alert);
+      color: var(--red-alert);
     }
 
     .status-dot {
@@ -355,7 +506,7 @@
       font-family: 'Courier New', monospace;
       font-size: 0.8rem;
       line-height: 1.5;
-      max-height: 600px;
+      max-height: 500px;
       overflow-y: auto;
       position: relative;
       box-shadow: inset 0 0 20px rgba(255, 107, 26, 0.1);
@@ -392,26 +543,11 @@
       border: 1px solid var(--orange-primary);
     }
 
-    .output-terminal::-webkit-scrollbar-thumb:hover {
-      background: var(--orange-primary);
-    }
-
     /* JSON Output Styling */
-    .json-key {
-      color: var(--orange-glow);
-    }
-
-    .json-string {
-      color: var(--green-terminal);
-    }
-
-    .json-number {
-      color: var(--amber-warning);
-    }
-
-    .json-bool {
-      color: #00d4ff;
-    }
+    .json-key { color: var(--orange-glow); }
+    .json-string { color: var(--green-terminal); }
+    .json-number { color: var(--amber-warning); }
+    .json-bool { color: var(--blue-info); }
 
     /* Image Upload */
     .upload-zone {
@@ -442,290 +578,1488 @@
       letter-spacing: 0.08em;
     }
 
-    /* Footer */
-    .terminal-footer {
-      margin-top: 20px;
-      padding: 12px 20px;
+    /* Table Styling */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .data-table th {
+      background: var(--bg-secondary);
+      color: var(--orange-glow);
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      padding: 10px;
+      text-align: left;
+      border-bottom: 2px solid var(--orange-dark);
+    }
+
+    .data-table td {
+      padding: 10px;
+      border-bottom: 1px solid #333;
+      color: var(--text-primary);
+    }
+
+    .data-table tr:hover {
+      background: rgba(255, 107, 26, 0.05);
+    }
+
+    .data-table .status-online {
+      color: var(--green-terminal);
+    }
+
+    .data-table .status-offline {
+      color: var(--red-alert);
+    }
+
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .camera-card {
       background: var(--bg-panel);
       border: 1px solid var(--orange-dark);
-      border-top: 2px solid var(--orange-primary);
-      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .camera-card:hover {
+      border-color: var(--orange-primary);
+      box-shadow: 0 0 20px rgba(255, 107, 26, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .camera-card-header {
+      background: var(--bg-secondary);
+      padding: 12px;
+      border-bottom: 1px solid var(--orange-dark);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .camera-card-id {
+      font-size: 0.85rem;
+      color: var(--orange-glow);
+      font-weight: bold;
+    }
+
+    .camera-card-status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green-terminal);
+      box-shadow: 0 0 8px var(--green-terminal);
+    }
+
+    .camera-card-status.warning {
+      background: var(--amber-warning);
+      box-shadow: 0 0 8px var(--amber-warning);
+    }
+
+    .camera-card-status.error {
+      background: var(--red-alert);
+      box-shadow: 0 0 8px var(--red-alert);
+    }
+
+    .camera-card-body {
+      padding: 12px;
+    }
+
+    .camera-card-location {
+      font-size: 0.75rem;
       color: var(--text-dim);
-      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .camera-card-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .camera-card-stat {
+      font-size: 0.7rem;
+    }
+
+    .camera-card-stat-label {
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .camera-card-stat-value {
+      color: var(--text-primary);
+      font-size: 0.85rem;
+    }
+
+    .confidence-high { color: var(--green-terminal); }
+    .confidence-medium { color: var(--amber-warning); }
+    .confidence-low { color: var(--red-alert); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 500;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-panel);
+      border: 2px solid var(--orange-primary);
+      max-width: 800px;
+      max-height: 90vh;
+      width: 100%;
+      overflow-y: auto;
+      box-shadow: 0 0 40px rgba(255, 107, 26, 0.3);
+    }
+
+    .modal-header {
+      background: var(--bg-secondary);
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--orange-dark);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      color: var(--orange-glow);
+      font-size: 1rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
 
-    /* Glitch Effect (subtle) */
-    @keyframes glitch {
-      0%, 100% { transform: translate(0); }
-      33% { transform: translate(-1px, 1px); }
-      66% { transform: translate(1px, -1px); }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0 5px;
     }
 
-    .glitch-effect {
-      animation: glitch 0.3s infinite;
+    .modal-close:hover {
+      color: var(--orange-primary);
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    /* Health Gauge */
+    .health-gauge {
+      width: 100px;
+      height: 100px;
+      position: relative;
+      display: inline-block;
+    }
+
+    .health-gauge-circle {
+      transform: rotate(-90deg);
+    }
+
+    .health-gauge-bg {
+      fill: none;
+      stroke: #333;
+      stroke-width: 8;
+    }
+
+    .health-gauge-fill {
+      fill: none;
+      stroke: var(--green-terminal);
+      stroke-width: 8;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.5s;
+    }
+
+    .health-gauge-fill.warning {
+      stroke: var(--amber-warning);
+    }
+
+    .health-gauge-fill.error {
+      stroke: var(--red-alert);
+    }
+
+    .health-gauge-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.2rem;
+      color: var(--text-primary);
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+
+    .empty-state-icon {
+      font-size: 3rem;
+      color: var(--orange-dark);
+      margin-bottom: 20px;
+    }
+
+    .empty-state-text {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Action Bar */
+    .action-bar {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    /* Grid layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 800px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Responsive sidebar */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 60px;
+      }
+      .nav-label, .nav-badge {
+        display: none;
+      }
+      .nav-icon {
+        font-size: 1.4rem;
+      }
+      .nav-item {
+        justify-content: center;
+        padding: 14px 10px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="app-container">
     <!-- Terminal Header -->
-    <div class="terminal-header">
+    <header class="terminal-header">
       <div>
         <div class="system-title">
           <span class="status-indicator"></span>
           CAMOPT v0.2 // SURVEILLANCE OPTIMIZATION
         </div>
-        <div class="subtitle">
-          SECURITY SYSTEMS CONFIGURATION TERMINAL
+      </div>
+      <div class="header-stats">
+        <div class="header-stat">
+          <span>CAMERAS:</span>
+          <span class="header-stat-value" id="camera-count">0</span>
+        </div>
+        <div class="header-stat">
+          <span>OPTIMIZED:</span>
+          <span class="header-stat-value" id="optimized-count">0</span>
+        </div>
+        <div class="header-stat">
+          <span>HEALTH:</span>
+          <span class="header-stat-value" id="health-status">--</span>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- Main Grid -->
-    <div class="main-grid">
-      <!-- Left Panel: Input -->
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">CAMERA CONFIGURATION INPUT</div>
-          <div class="status-badge" id="status-badge">
-            <span class="status-dot"></span>
-            <span id="status-text">READY</span>
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Sidebar Navigation -->
+      <nav class="sidebar">
+        <div class="sidebar-nav">
+          <div class="nav-item active" data-section="import">
+            <span class="nav-icon">+</span>
+            <span class="nav-label">Import</span>
+          </div>
+          <div class="nav-item" data-section="optimize">
+            <span class="nav-icon">*</span>
+            <span class="nav-label">Optimize</span>
+          </div>
+          <div class="nav-item" data-section="results">
+            <span class="nav-icon">#</span>
+            <span class="nav-label">Results</span>
+            <span class="nav-badge" id="results-badge">0</span>
+          </div>
+          <div class="nav-item" data-section="health">
+            <span class="nav-icon">~</span>
+            <span class="nav-label">Health</span>
           </div>
         </div>
-        <div class="panel-body">
-          <form id="config-form">
-            <!-- System Identification -->
-            <div class="form-section">
-              <div class="section-header">// SYSTEM IDENTIFICATION</div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>CAMERA ID</label>
-                  <input type="text" id="camera-id" placeholder="CAM-001" value="CAM-ENTRANCE-01" />
-                </div>
-                <div class="form-group">
-                  <label>IP ADDRESS</label>
-                  <input type="text" id="camera-ip" placeholder="192.168.1.100" value="192.168.1.100" />
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>LOCATION</label>
-                  <input type="text" id="location" placeholder="Main Entrance" value="Main Lobby Entrance" />
-                </div>
-                <div class="form-group">
-                  <label>VMS SYSTEM</label>
-                  <select id="vms-system">
-                    <option value="none">None / Generic</option>
-                    <option value="genetec" selected>Genetec Security Center</option>
-                    <option value="milestone">Milestone XProtect</option>
-                    <option value="avigilon">Avigilon ACC</option>
-                    <option value="exacq">Exacq</option>
-                    <option value="hanwha">Hanwha WAVE</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Scene Analysis -->
-            <div class="form-section">
-              <div class="section-header">// SCENE CLASSIFICATION</div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>SCENE TYPE</label>
-                  <select id="scene-type">
-                    <option value="entrance" selected>Entrance / Lobby</option>
-                    <option value="hallway">Hallway / Corridor</option>
-                    <option value="parking">Parking Lot / Garage</option>
-                    <option value="perimeter">Perimeter / Fence Line</option>
-                    <option value="interior">Interior / Office</option>
-                    <option value="cashwrap">Cashwrap / POS</option>
-                    <option value="warehouse">Warehouse / Loading</option>
-                    <option value="stairwell">Stairwell / Elevator</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>PRIMARY PURPOSE</label>
-                  <select id="purpose">
-                    <option value="overview">Overview / General</option>
-                    <option value="facial" selected>Facial Recognition</option>
-                    <option value="plates">License Plate (LPR)</option>
-                    <option value="behavior">Behavior Analysis</option>
-                    <option value="counting">People Counting</option>
-                    <option value="evidence">Evidence Quality</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Environmental Factors -->
-            <div class="form-section">
-              <div class="section-header">// ENVIRONMENTAL ANALYSIS</div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>LIGHTING CONDITIONS</label>
-                  <select id="lighting">
-                    <option value="constant">Constant Indoor</option>
-                    <option value="variable" selected>Variable (WDR Needed)</option>
-                    <option value="lowlight">Low-Light / Night</option>
-                    <option value="outdoor">Outdoor / Daylight</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>MOTION LEVEL</label>
-                  <select id="motion">
-                    <option value="static">Static / Minimal</option>
-                    <option value="low">Low Motion</option>
-                    <option value="medium" selected>Medium Traffic</option>
-                    <option value="high">High Traffic</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Resource Constraints -->
-            <div class="form-section">
-              <div class="section-header">// RESOURCE CONSTRAINTS</div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>BANDWIDTH LIMIT (Mbps)</label>
-                  <input type="number" id="bandwidth" placeholder="4.0" value="4.0" step="0.1" />
-                </div>
-                <div class="form-group">
-                  <label>RETENTION (DAYS)</label>
-                  <input type="number" id="retention" placeholder="30" value="30" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Sample Frame Upload -->
-            <div class="form-section">
-              <div class="section-header">// SAMPLE FRAME UPLOAD (OPTIONAL)</div>
-              <div class="upload-zone" id="upload-zone">
-                <div class="upload-icon">⬆</div>
-                <div class="upload-text">Drop camera snapshot here or click to browse</div>
-                <input type="file" id="file-input" accept="image/*" style="display: none;" />
-              </div>
-            </div>
-
-            <!-- Action Button -->
-            <button type="submit" class="btn" id="generate-btn">
-              ▶ GENERATE OPTIMIZATION
-            </button>
-          </form>
+        <div class="sidebar-footer">
+          CLAUDE VISION AI
         </div>
-      </div>
+      </nav>
 
-      <!-- Right Panel: Output -->
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">OPTIMIZATION OUTPUT</div>
-        </div>
-        <div class="panel-body" style="padding: 0;">
-          <div class="output-terminal">
-            <div class="output-content" id="output">// AWAITING OPTIMIZATION REQUEST...</div>
+      <!-- Content Area -->
+      <main class="content-area">
+        <!-- ========== IMPORT SECTION ========== -->
+        <section class="section active" id="section-import">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Camera Import</div>
+            </div>
+            <div class="sub-tabs">
+              <div class="sub-tab active" data-subtab="manual">Manual Entry</div>
+              <div class="sub-tab" data-subtab="onvif">ONVIF Discovery</div>
+              <div class="sub-tab" data-subtab="wave">WAVE VMS</div>
+              <div class="sub-tab" data-subtab="csv">CSV Import</div>
+            </div>
+
+            <!-- Manual Entry -->
+            <div class="sub-content active" id="subtab-manual">
+              <div class="panel-body">
+                <form id="manual-import-form">
+                  <div class="form-section">
+                    <div class="section-header">// Camera Details</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Camera ID</label>
+                        <input type="text" id="manual-camera-id" placeholder="CAM-001" required />
+                      </div>
+                      <div class="form-group">
+                        <label>IP Address</label>
+                        <input type="text" id="manual-camera-ip" placeholder="192.168.1.100" required />
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Location</label>
+                        <input type="text" id="manual-camera-location" placeholder="Main Entrance" />
+                      </div>
+                      <div class="form-group">
+                        <label>VMS System</label>
+                        <select id="manual-camera-vms">
+                          <option value="none">None / Standalone</option>
+                          <option value="genetec">Genetec Security Center</option>
+                          <option value="milestone">Milestone XProtect</option>
+                          <option value="avigilon">Avigilon ACC</option>
+                          <option value="exacq">Exacq</option>
+                          <option value="hanwha-wave">Hanwha WAVE</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Vendor</label>
+                        <input type="text" id="manual-camera-vendor" placeholder="Axis, Hanwha, Hikvision..." />
+                      </div>
+                      <div class="form-group">
+                        <label>Model</label>
+                        <input type="text" id="manual-camera-model" placeholder="P3245-V" />
+                      </div>
+                    </div>
+                  </div>
+                  <button type="submit" class="btn">+ Add Camera</button>
+                </form>
+              </div>
+            </div>
+
+            <!-- ONVIF Discovery -->
+            <div class="sub-content" id="subtab-onvif">
+              <div class="panel-body">
+                <div class="form-section">
+                  <div class="section-header">// Network Discovery</div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Discovery Timeout (seconds)</label>
+                      <input type="number" id="onvif-timeout" value="5" min="1" max="30" />
+                    </div>
+                    <div class="form-group">
+                      <label>Max Cameras</label>
+                      <input type="number" id="onvif-max" value="50" min="1" max="200" />
+                    </div>
+                  </div>
+                  <button type="button" class="btn" id="onvif-scan-btn">Scan Network</button>
+                </div>
+
+                <div class="form-section" id="onvif-results" style="display: none;">
+                  <div class="section-header">// Discovered Cameras</div>
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th><input type="checkbox" id="onvif-select-all" /></th>
+                        <th>IP Address</th>
+                        <th>Vendor</th>
+                        <th>Model</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="onvif-table-body">
+                    </tbody>
+                  </table>
+                  <div class="action-bar">
+                    <button type="button" class="btn" id="onvif-import-btn">Import Selected</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- WAVE VMS -->
+            <div class="sub-content" id="subtab-wave">
+              <div class="panel-body">
+                <div class="form-section">
+                  <div class="section-header">// WAVE Server Connection</div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Server IP</label>
+                      <input type="text" id="wave-server-ip" placeholder="192.168.1.50" />
+                    </div>
+                    <div class="form-group">
+                      <label>Port</label>
+                      <input type="number" id="wave-port" value="7001" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Username</label>
+                      <input type="text" id="wave-username" value="admin" />
+                    </div>
+                    <div class="form-group">
+                      <label>Password</label>
+                      <input type="password" id="wave-password" />
+                    </div>
+                  </div>
+                  <button type="button" class="btn" id="wave-connect-btn">Connect to WAVE</button>
+                </div>
+
+                <div class="form-section" id="wave-results" style="display: none;">
+                  <div class="section-header">// WAVE Cameras</div>
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th><input type="checkbox" id="wave-select-all" /></th>
+                        <th>Camera Name</th>
+                        <th>IP Address</th>
+                        <th>Vendor</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="wave-table-body">
+                    </tbody>
+                  </table>
+                  <div class="action-bar">
+                    <button type="button" class="btn" id="wave-import-btn">Import Selected</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CSV Import -->
+            <div class="sub-content" id="subtab-csv">
+              <div class="panel-body">
+                <div class="form-section">
+                  <div class="section-header">// CSV File Upload</div>
+                  <div class="upload-zone" id="csv-upload-zone">
+                    <div class="upload-icon">CSV</div>
+                    <div class="upload-text">Drop CSV file here or click to browse</div>
+                    <input type="file" id="csv-file-input" accept=".csv" style="display: none;" />
+                  </div>
+                  <div style="margin-top: 15px; font-size: 0.75rem; color: var(--text-dim);">
+                    Expected columns: id, ip, location, vendor, model, vms_system
+                  </div>
+                </div>
+
+                <div class="form-section" id="csv-results" style="display: none;">
+                  <div class="section-header">// Preview</div>
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Camera ID</th>
+                        <th>IP Address</th>
+                        <th>Location</th>
+                        <th>Vendor</th>
+                        <th>Model</th>
+                      </tr>
+                    </thead>
+                    <tbody id="csv-table-body">
+                    </tbody>
+                  </table>
+                  <div class="action-bar">
+                    <button type="button" class="btn" id="csv-import-btn">Import All</button>
+                    <button type="button" class="btn btn-secondary" id="csv-clear-btn">Clear</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Footer -->
-    <div class="terminal-footer">
-      CAMOPT AI v0.2 // ANTHROPIC CLAUDE VISION POWERED // SECURITY INTEGRATOR TOOL
+          <!-- Camera Inventory -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Camera Inventory</div>
+              <span class="status-badge">
+                <span class="status-dot"></span>
+                <span id="inventory-count">0</span> cameras
+              </span>
+            </div>
+            <div class="panel-body">
+              <div id="camera-inventory-empty" class="empty-state">
+                <div class="empty-state-icon">+</div>
+                <div class="empty-state-text">No cameras imported yet</div>
+              </div>
+              <table class="data-table" id="camera-inventory-table" style="display: none;">
+                <thead>
+                  <tr>
+                    <th>Camera ID</th>
+                    <th>IP Address</th>
+                    <th>Location</th>
+                    <th>Source</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="inventory-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== OPTIMIZE SECTION ========== -->
+        <section class="section" id="section-optimize">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Camera Configuration</div>
+                <div class="status-badge" id="optimize-status-badge">
+                  <span class="status-dot"></span>
+                  <span id="optimize-status-text">READY</span>
+                </div>
+              </div>
+              <div class="panel-body">
+                <form id="optimize-form">
+                  <!-- Camera Selection -->
+                  <div class="form-section">
+                    <div class="section-header">// Select Camera</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Camera</label>
+                        <select id="optimize-camera-select">
+                          <option value="">-- Select Camera --</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Scene Classification -->
+                  <div class="form-section">
+                    <div class="section-header">// Scene Classification</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Scene Type</label>
+                        <select id="scene-type">
+                          <option value="entrance">Entrance / Lobby</option>
+                          <option value="hallway">Hallway / Corridor</option>
+                          <option value="parking">Parking Lot / Garage</option>
+                          <option value="perimeter">Perimeter / Fence Line</option>
+                          <option value="interior">Interior / Office</option>
+                          <option value="cashwrap">Cashwrap / POS</option>
+                          <option value="warehouse">Warehouse / Loading</option>
+                          <option value="stairwell">Stairwell / Elevator</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Primary Purpose</label>
+                        <select id="purpose">
+                          <option value="overview">Overview / General</option>
+                          <option value="facial">Facial Recognition</option>
+                          <option value="plates">License Plate (LPR)</option>
+                          <option value="behavior">Behavior Analysis</option>
+                          <option value="counting">People Counting</option>
+                          <option value="evidence">Evidence Quality</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Environmental Factors -->
+                  <div class="form-section">
+                    <div class="section-header">// Environmental Analysis</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Lighting Conditions</label>
+                        <select id="lighting">
+                          <option value="constant">Constant Indoor</option>
+                          <option value="variable">Variable (WDR Needed)</option>
+                          <option value="lowlight">Low-Light / Night</option>
+                          <option value="outdoor">Outdoor / Daylight</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Motion Level</label>
+                        <select id="motion">
+                          <option value="static">Static / Minimal</option>
+                          <option value="low">Low Motion</option>
+                          <option value="medium">Medium Traffic</option>
+                          <option value="high">High Traffic</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Resource Constraints -->
+                  <div class="form-section">
+                    <div class="section-header">// Resource Constraints</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Bandwidth Limit (Mbps)</label>
+                        <input type="number" id="bandwidth" placeholder="4.0" value="4.0" step="0.1" />
+                      </div>
+                      <div class="form-group">
+                        <label>Retention (Days)</label>
+                        <input type="number" id="retention" placeholder="30" value="30" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Sample Frame Upload -->
+                  <div class="form-section">
+                    <div class="section-header">// Sample Frame (Optional)</div>
+                    <div class="upload-zone" id="sample-upload-zone">
+                      <div class="upload-icon">IMG</div>
+                      <div class="upload-text">Drop camera snapshot or click to browse</div>
+                      <input type="file" id="sample-file-input" accept="image/*" style="display: none;" />
+                    </div>
+                  </div>
+
+                  <button type="submit" class="btn" id="generate-btn">Generate Optimization</button>
+                </form>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Optimization Output</div>
+              </div>
+              <div class="panel-body" style="padding: 0;">
+                <div class="output-terminal">
+                  <div class="output-content" id="optimize-output">// SELECT A CAMERA AND GENERATE OPTIMIZATION...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== RESULTS SECTION ========== -->
+        <section class="section" id="section-results">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Optimization Results</div>
+              <div class="status-badge">
+                <span id="total-optimizations">0</span> optimizations
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="results-empty" class="empty-state">
+                <div class="empty-state-icon">#</div>
+                <div class="empty-state-text">No optimization results yet</div>
+              </div>
+              <div id="results-grid" class="card-grid" style="display: none;">
+                <!-- Cards populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== HEALTH SECTION ========== -->
+        <section class="section" id="section-health">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Schedule Monitoring</div>
+              </div>
+              <div class="panel-body">
+                <form id="health-schedule-form">
+                  <div class="form-section">
+                    <div class="section-header">// Select Cameras</div>
+                    <div id="health-camera-list">
+                      <!-- Checkboxes populated dynamically -->
+                    </div>
+                  </div>
+
+                  <div class="form-section">
+                    <div class="section-header">// Schedule Settings</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Check Interval</label>
+                        <select id="health-interval">
+                          <option value="hourly">Every Hour</option>
+                          <option value="daily" selected>Daily</option>
+                          <option value="weekly">Weekly</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Time of Day</label>
+                        <input type="time" id="health-time" value="02:00" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
+                    <div class="section-header">// Drift Detection</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Confidence Threshold</label>
+                        <input type="number" id="health-threshold" value="70" min="0" max="100" step="5" />
+                        <span style="font-size: 0.7rem; color: var(--text-dim);">Alert if confidence drops below this %</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="action-bar">
+                    <button type="submit" class="btn">Save Schedule</button>
+                    <button type="button" class="btn btn-secondary" id="health-check-now-btn">Check Now</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Health Status</div>
+              </div>
+              <div class="panel-body">
+                <div id="health-status-empty" class="empty-state">
+                  <div class="empty-state-icon">~</div>
+                  <div class="empty-state-text">No health data yet</div>
+                </div>
+                <div id="health-status-grid" class="card-grid" style="display: none;">
+                  <!-- Health cards populated dynamically -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">Camera Details</div>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Dynamic content -->
+      </div>
     </div>
   </div>
 
   <script>
-    // Global state
-    let sampleFrameBase64 = null;
+    // ============================================================
+    // CAMOPT AI - Frontend Application
+    // ============================================================
 
-    // API endpoint configuration
-    // If opened as file:// or localhost, use local backend
+    // ---- Configuration ----
     const API_BASE = (window.location.protocol === 'file:' ||
                       window.location.hostname === 'localhost' ||
                       window.location.hostname === '127.0.0.1' ||
                       window.location.hostname === '')
       ? 'http://localhost:8000'
-      : 'https://your-backend-url.com';  // Update when deployed
+      : 'https://your-backend-url.com';
 
     console.log('API Base URL:', API_BASE);
 
-    // Status management
-    function setStatus(mode, message) {
-      const badge = document.getElementById('status-badge');
-      const text = document.getElementById('status-text');
+    // ---- State Management ----
+    const state = {
+      cameras: [],
+      optimizations: [],
+      healthSchedules: [],
+      sampleFrameBase64: null,
+      discoveredOnvif: [],
+      discoveredWave: [],
+      parsedCsv: []
+    };
 
-      badge.className = 'status-badge ' + mode;
-      text.textContent = message;
+    // Load state from localStorage
+    function loadState() {
+      try {
+        const saved = localStorage.getItem('camopt_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          state.cameras = parsed.cameras || [];
+          state.optimizations = parsed.optimizations || [];
+          state.healthSchedules = parsed.healthSchedules || [];
+        }
+      } catch (e) {
+        console.error('Failed to load state:', e);
+      }
+      updateUI();
     }
 
-    // File upload handling
-    const uploadZone = document.getElementById('upload-zone');
-    const fileInput = document.getElementById('file-input');
-
-    uploadZone.addEventListener('click', () => fileInput.click());
-
-    uploadZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadZone.style.borderColor = 'var(--orange-primary)';
-    });
-
-    uploadZone.addEventListener('dragleave', () => {
-      uploadZone.style.borderColor = 'var(--orange-dark)';
-    });
-
-    uploadZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadZone.style.borderColor = 'var(--orange-dark)';
-      const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith('image/')) {
-        handleImageUpload(file);
+    // Save state to localStorage
+    function saveState() {
+      try {
+        localStorage.setItem('camopt_state', JSON.stringify({
+          cameras: state.cameras,
+          optimizations: state.optimizations,
+          healthSchedules: state.healthSchedules
+        }));
+      } catch (e) {
+        console.error('Failed to save state:', e);
       }
-    });
+      updateUI();
+    }
 
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        handleImageUpload(file);
+    // ---- UI Updates ----
+    function updateUI() {
+      // Header stats
+      document.getElementById('camera-count').textContent = state.cameras.length;
+      document.getElementById('optimized-count').textContent = state.optimizations.length;
+      document.getElementById('results-badge').textContent = state.optimizations.length;
+
+      // Calculate overall health
+      const healthyCount = state.optimizations.filter(o => o.confidence >= 0.7).length;
+      const healthPct = state.optimizations.length > 0
+        ? Math.round((healthyCount / state.optimizations.length) * 100)
+        : '--';
+      document.getElementById('health-status').textContent = healthPct === '--' ? '--' : healthPct + '%';
+
+      // Update inventory table
+      updateInventoryTable();
+
+      // Update camera selector
+      updateCameraSelector();
+
+      // Update results grid
+      updateResultsGrid();
+
+      // Update health section
+      updateHealthSection();
+
+      // Update inventory count
+      document.getElementById('inventory-count').textContent = state.cameras.length;
+    }
+
+    function updateInventoryTable() {
+      const empty = document.getElementById('camera-inventory-empty');
+      const table = document.getElementById('camera-inventory-table');
+      const tbody = document.getElementById('inventory-table-body');
+
+      if (state.cameras.length === 0) {
+        empty.style.display = 'block';
+        table.style.display = 'none';
+        return;
       }
-    });
 
-    function handleImageUpload(file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        sampleFrameBase64 = e.target.result;
-        uploadZone.innerHTML = `
-          <div class="upload-icon">✓</div>
-          <div class="upload-text">IMAGE LOADED: ${file.name}</div>
-          <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 8px;">
-            ${(file.size / 1024).toFixed(1)} KB
+      empty.style.display = 'none';
+      table.style.display = 'table';
+
+      tbody.innerHTML = state.cameras.map((cam, idx) => `
+        <tr>
+          <td>${escapeHtml(cam.id)}</td>
+          <td>${escapeHtml(cam.ip)}</td>
+          <td>${escapeHtml(cam.location || '-')}</td>
+          <td>${escapeHtml(cam.source || 'manual')}</td>
+          <td>
+            <button class="btn btn-sm btn-secondary" onclick="removeCamera(${idx})">Remove</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateCameraSelector() {
+      const select = document.getElementById('optimize-camera-select');
+      const currentValue = select.value;
+
+      select.innerHTML = '<option value="">-- Select Camera --</option>' +
+        state.cameras.map(cam => `
+          <option value="${escapeHtml(cam.id)}">${escapeHtml(cam.id)} (${escapeHtml(cam.ip)})</option>
+        `).join('');
+
+      // Restore selection if still valid
+      if (currentValue && state.cameras.find(c => c.id === currentValue)) {
+        select.value = currentValue;
+      }
+    }
+
+    function updateResultsGrid() {
+      const empty = document.getElementById('results-empty');
+      const grid = document.getElementById('results-grid');
+      document.getElementById('total-optimizations').textContent = state.optimizations.length;
+
+      if (state.optimizations.length === 0) {
+        empty.style.display = 'block';
+        grid.style.display = 'none';
+        return;
+      }
+
+      empty.style.display = 'none';
+      grid.style.display = 'grid';
+
+      // Group by camera, show latest
+      const latestByCam = {};
+      state.optimizations.forEach(opt => {
+        if (!latestByCam[opt.cameraId] || new Date(opt.timestamp) > new Date(latestByCam[opt.cameraId].timestamp)) {
+          latestByCam[opt.cameraId] = opt;
+        }
+      });
+
+      grid.innerHTML = Object.values(latestByCam).map((opt, idx) => {
+        const cam = state.cameras.find(c => c.id === opt.cameraId) || {};
+        const confPct = Math.round(opt.confidence * 100);
+        const confClass = confPct >= 80 ? 'confidence-high' : confPct >= 60 ? 'confidence-medium' : 'confidence-low';
+        const statusClass = confPct >= 70 ? '' : confPct >= 50 ? 'warning' : 'error';
+        const date = new Date(opt.timestamp).toLocaleDateString();
+
+        return `
+          <div class="camera-card" onclick="showOptimizationDetail('${escapeHtml(opt.cameraId)}')">
+            <div class="camera-card-header">
+              <div class="camera-card-id">${escapeHtml(opt.cameraId)}</div>
+              <div class="camera-card-status ${statusClass}"></div>
+            </div>
+            <div class="camera-card-body">
+              <div class="camera-card-location">${escapeHtml(cam.location || 'Unknown Location')}</div>
+              <div class="camera-card-stats">
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Confidence</div>
+                  <div class="camera-card-stat-value ${confClass}">${confPct}%</div>
+                </div>
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Provider</div>
+                  <div class="camera-card-stat-value">${opt.aiProvider === 'heuristic' ? 'HEURISTIC' : 'CLAUDE'}</div>
+                </div>
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Optimized</div>
+                  <div class="camera-card-stat-value">${date}</div>
+                </div>
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Warnings</div>
+                  <div class="camera-card-stat-value">${opt.warnings?.length || 0}</div>
+                </div>
+              </div>
+            </div>
           </div>
         `;
-        setStatus('success', 'IMAGE READY');
+      }).join('');
+    }
+
+    function updateHealthSection() {
+      // Update camera checkboxes
+      const list = document.getElementById('health-camera-list');
+      if (state.cameras.length === 0) {
+        list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem;">No cameras imported</div>';
+      } else {
+        list.innerHTML = state.cameras.map(cam => `
+          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+            <input type="checkbox" class="health-camera-checkbox" value="${escapeHtml(cam.id)}" />
+            <span>${escapeHtml(cam.id)} - ${escapeHtml(cam.location || cam.ip)}</span>
+          </label>
+        `).join('');
+      }
+
+      // Update health status grid
+      const empty = document.getElementById('health-status-empty');
+      const grid = document.getElementById('health-status-grid');
+
+      if (state.healthSchedules.length === 0) {
+        empty.style.display = 'block';
+        grid.style.display = 'none';
+        return;
+      }
+
+      empty.style.display = 'none';
+      grid.style.display = 'grid';
+
+      grid.innerHTML = state.healthSchedules.map(schedule => {
+        const lastHealth = schedule.lastHealth || {};
+        const confPct = lastHealth.confidence ? Math.round(lastHealth.confidence * 100) : '--';
+        const confClass = confPct >= 80 ? 'confidence-high' : confPct >= 60 ? 'confidence-medium' : 'confidence-low';
+
+        return `
+          <div class="camera-card">
+            <div class="camera-card-header">
+              <div class="camera-card-id">${escapeHtml(schedule.cameraId)}</div>
+              <div class="camera-card-status ${schedule.enabled ? '' : 'warning'}"></div>
+            </div>
+            <div class="camera-card-body">
+              <div class="camera-card-stats">
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Health</div>
+                  <div class="camera-card-stat-value ${confClass}">${confPct}%</div>
+                </div>
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Interval</div>
+                  <div class="camera-card-stat-value">${schedule.interval}</div>
+                </div>
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Last Check</div>
+                  <div class="camera-card-stat-value">${schedule.lastCheck ? new Date(schedule.lastCheck).toLocaleDateString() : 'Never'}</div>
+                </div>
+                <div class="camera-card-stat">
+                  <div class="camera-card-stat-label">Drift</div>
+                  <div class="camera-card-stat-value">${lastHealth.driftDetected ? 'YES' : 'NO'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ---- Navigation ----
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const section = item.dataset.section;
+
+        // Update nav
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+
+        // Update sections
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById('section-' + section).classList.add('active');
+      });
+    });
+
+    // Sub-tabs
+    document.querySelectorAll('.sub-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const subtab = tab.dataset.subtab;
+        const parent = tab.closest('.panel');
+
+        parent.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        parent.querySelectorAll('.sub-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('subtab-' + subtab).classList.add('active');
+      });
+    });
+
+    // ---- Camera Import: Manual ----
+    document.getElementById('manual-import-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const camera = {
+        id: document.getElementById('manual-camera-id').value.trim(),
+        ip: document.getElementById('manual-camera-ip').value.trim(),
+        location: document.getElementById('manual-camera-location').value.trim(),
+        vmsSystem: document.getElementById('manual-camera-vms').value,
+        vendor: document.getElementById('manual-camera-vendor').value.trim(),
+        model: document.getElementById('manual-camera-model').value.trim(),
+        source: 'manual',
+        importedAt: new Date().toISOString()
+      };
+
+      if (!camera.id || !camera.ip) {
+        alert('Camera ID and IP are required');
+        return;
+      }
+
+      if (state.cameras.find(c => c.id === camera.id)) {
+        alert('Camera with this ID already exists');
+        return;
+      }
+
+      state.cameras.push(camera);
+      saveState();
+
+      // Clear form
+      e.target.reset();
+      showToast('Camera added: ' + camera.id);
+    });
+
+    // ---- Camera Import: ONVIF ----
+    document.getElementById('onvif-scan-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('onvif-scan-btn');
+      const timeout = document.getElementById('onvif-timeout').value;
+      const maxCameras = document.getElementById('onvif-max').value;
+
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/discover?timeout=${timeout}&max_cameras=${maxCameras}`);
+        const data = await response.json();
+
+        state.discoveredOnvif = data.cameras || [];
+
+        if (state.discoveredOnvif.length === 0) {
+          alert('No cameras found on network');
+          document.getElementById('onvif-results').style.display = 'none';
+          return;
+        }
+
+        // Populate table
+        const tbody = document.getElementById('onvif-table-body');
+        tbody.innerHTML = state.discoveredOnvif.map((cam, idx) => `
+          <tr>
+            <td><input type="checkbox" class="onvif-checkbox" data-idx="${idx}" /></td>
+            <td>${escapeHtml(cam.ip || cam.address || '-')}</td>
+            <td>${escapeHtml(cam.vendor || cam.manufacturer || '-')}</td>
+            <td>${escapeHtml(cam.model || '-')}</td>
+            <td class="status-online">Online</td>
+          </tr>
+        `).join('');
+
+        document.getElementById('onvif-results').style.display = 'block';
+
+      } catch (error) {
+        console.error('ONVIF discovery error:', error);
+        alert('Discovery failed: ' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scan Network';
+      }
+    });
+
+    document.getElementById('onvif-select-all').addEventListener('change', (e) => {
+      document.querySelectorAll('.onvif-checkbox').forEach(cb => cb.checked = e.target.checked);
+    });
+
+    document.getElementById('onvif-import-btn').addEventListener('click', () => {
+      const selected = [];
+      document.querySelectorAll('.onvif-checkbox:checked').forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        selected.push(state.discoveredOnvif[idx]);
+      });
+
+      if (selected.length === 0) {
+        alert('No cameras selected');
+        return;
+      }
+
+      selected.forEach(cam => {
+        const id = 'CAM-' + (cam.ip || '').replace(/\./g, '-');
+        if (!state.cameras.find(c => c.id === id)) {
+          state.cameras.push({
+            id: id,
+            ip: cam.ip || cam.address || '',
+            location: '',
+            vendor: cam.vendor || cam.manufacturer || '',
+            model: cam.model || '',
+            source: 'onvif',
+            importedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      saveState();
+      showToast(`Imported ${selected.length} cameras`);
+      document.getElementById('onvif-results').style.display = 'none';
+    });
+
+    // ---- Camera Import: WAVE ----
+    document.getElementById('wave-connect-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('wave-connect-btn');
+      const serverIp = document.getElementById('wave-server-ip').value.trim();
+      const port = document.getElementById('wave-port').value;
+      const username = document.getElementById('wave-username').value;
+      const password = document.getElementById('wave-password').value;
+
+      if (!serverIp) {
+        alert('Server IP is required');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/wave/discover?server_ip=${serverIp}&port=${port}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+        );
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        state.discoveredWave = data.cameras || [];
+
+        if (state.discoveredWave.length === 0) {
+          alert('No cameras found in WAVE system');
+          document.getElementById('wave-results').style.display = 'none';
+          return;
+        }
+
+        // Populate table
+        const tbody = document.getElementById('wave-table-body');
+        tbody.innerHTML = state.discoveredWave.map((cam, idx) => `
+          <tr>
+            <td><input type="checkbox" class="wave-checkbox" data-idx="${idx}" /></td>
+            <td>${escapeHtml(cam.name || cam.id || '-')}</td>
+            <td>${escapeHtml(cam.ip || '-')}</td>
+            <td>${escapeHtml(cam.vendor || '-')}</td>
+            <td class="${cam.status === 'Online' ? 'status-online' : 'status-offline'}">${cam.status || 'Unknown'}</td>
+          </tr>
+        `).join('');
+
+        document.getElementById('wave-results').style.display = 'block';
+
+      } catch (error) {
+        console.error('WAVE discovery error:', error);
+        alert('Connection failed: ' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Connect to WAVE';
+      }
+    });
+
+    document.getElementById('wave-select-all').addEventListener('change', (e) => {
+      document.querySelectorAll('.wave-checkbox').forEach(cb => cb.checked = e.target.checked);
+    });
+
+    document.getElementById('wave-import-btn').addEventListener('click', () => {
+      const selected = [];
+      document.querySelectorAll('.wave-checkbox:checked').forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        selected.push(state.discoveredWave[idx]);
+      });
+
+      if (selected.length === 0) {
+        alert('No cameras selected');
+        return;
+      }
+
+      selected.forEach(cam => {
+        const id = cam.id || 'CAM-WAVE-' + Date.now();
+        if (!state.cameras.find(c => c.id === id)) {
+          state.cameras.push({
+            id: id,
+            ip: cam.ip || '',
+            location: cam.name || '',
+            vendor: cam.vendor || '',
+            model: cam.model || '',
+            vmsSystem: 'hanwha-wave',
+            vmsCameraId: cam.id,
+            source: 'wave',
+            importedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      saveState();
+      showToast(`Imported ${selected.length} cameras`);
+      document.getElementById('wave-results').style.display = 'none';
+    });
+
+    // ---- Camera Import: CSV ----
+    const csvUploadZone = document.getElementById('csv-upload-zone');
+    const csvFileInput = document.getElementById('csv-file-input');
+
+    csvUploadZone.addEventListener('click', () => csvFileInput.click());
+    csvUploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      csvUploadZone.style.borderColor = 'var(--orange-primary)';
+    });
+    csvUploadZone.addEventListener('dragleave', () => {
+      csvUploadZone.style.borderColor = 'var(--orange-dark)';
+    });
+    csvUploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      csvUploadZone.style.borderColor = 'var(--orange-dark)';
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith('.csv')) {
+        handleCsvUpload(file);
+      }
+    });
+    csvFileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) {
+        handleCsvUpload(e.target.files[0]);
+      }
+    });
+
+    function handleCsvUpload(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        const lines = text.split('\n').filter(l => l.trim());
+
+        if (lines.length < 2) {
+          alert('CSV file must have header row and at least one data row');
+          return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        state.parsedCsv = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim());
+          const row = {};
+          headers.forEach((h, idx) => row[h] = values[idx] || '');
+
+          state.parsedCsv.push({
+            id: row.id || row.camera_id || 'CAM-' + i,
+            ip: row.ip || row.ip_address || '',
+            location: row.location || '',
+            vendor: row.vendor || row.manufacturer || '',
+            model: row.model || '',
+            vmsSystem: row.vms_system || row.vms || 'none'
+          });
+        }
+
+        // Display preview
+        const tbody = document.getElementById('csv-table-body');
+        tbody.innerHTML = state.parsedCsv.map(cam => `
+          <tr>
+            <td>${escapeHtml(cam.id)}</td>
+            <td>${escapeHtml(cam.ip)}</td>
+            <td>${escapeHtml(cam.location)}</td>
+            <td>${escapeHtml(cam.vendor)}</td>
+            <td>${escapeHtml(cam.model)}</td>
+          </tr>
+        `).join('');
+
+        document.getElementById('csv-results').style.display = 'block';
+        csvUploadZone.innerHTML = `
+          <div class="upload-icon">CSV</div>
+          <div class="upload-text">Loaded: ${file.name}</div>
+          <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 8px;">${state.parsedCsv.length} cameras</div>
+        `;
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('csv-import-btn').addEventListener('click', () => {
+      if (state.parsedCsv.length === 0) {
+        alert('No CSV data to import');
+        return;
+      }
+
+      let imported = 0;
+      state.parsedCsv.forEach(cam => {
+        if (!state.cameras.find(c => c.id === cam.id)) {
+          state.cameras.push({
+            ...cam,
+            source: 'csv',
+            importedAt: new Date().toISOString()
+          });
+          imported++;
+        }
+      });
+
+      saveState();
+      showToast(`Imported ${imported} cameras`);
+
+      // Clear
+      state.parsedCsv = [];
+      document.getElementById('csv-results').style.display = 'none';
+      csvUploadZone.innerHTML = `
+        <div class="upload-icon">CSV</div>
+        <div class="upload-text">Drop CSV file here or click to browse</div>
+      `;
+    });
+
+    document.getElementById('csv-clear-btn').addEventListener('click', () => {
+      state.parsedCsv = [];
+      document.getElementById('csv-results').style.display = 'none';
+      csvUploadZone.innerHTML = `
+        <div class="upload-icon">CSV</div>
+        <div class="upload-text">Drop CSV file here or click to browse</div>
+      `;
+    });
+
+    // ---- Remove Camera ----
+    function removeCamera(idx) {
+      if (confirm('Remove this camera from inventory?')) {
+        state.cameras.splice(idx, 1);
+        saveState();
+      }
+    }
+
+    // ---- Optimization ----
+    const sampleUploadZone = document.getElementById('sample-upload-zone');
+    const sampleFileInput = document.getElementById('sample-file-input');
+
+    sampleUploadZone.addEventListener('click', () => sampleFileInput.click());
+    sampleUploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      sampleUploadZone.style.borderColor = 'var(--orange-primary)';
+    });
+    sampleUploadZone.addEventListener('dragleave', () => {
+      sampleUploadZone.style.borderColor = 'var(--orange-dark)';
+    });
+    sampleUploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      sampleUploadZone.style.borderColor = 'var(--orange-dark)';
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        handleSampleUpload(file);
+      }
+    });
+    sampleFileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) {
+        handleSampleUpload(e.target.files[0]);
+      }
+    });
+
+    function handleSampleUpload(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state.sampleFrameBase64 = e.target.result;
+        sampleUploadZone.innerHTML = `
+          <div class="upload-icon">IMG</div>
+          <div class="upload-text">Loaded: ${file.name}</div>
+          <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 8px;">${(file.size / 1024).toFixed(1)} KB</div>
+        `;
       };
       reader.readAsDataURL(file);
     }
 
-    // Form submission
-    document.getElementById('config-form').addEventListener('submit', async (e) => {
+    function setOptimizeStatus(mode, message) {
+      const badge = document.getElementById('optimize-status-badge');
+      const text = document.getElementById('optimize-status-text');
+      badge.className = 'status-badge ' + mode;
+      text.textContent = message;
+    }
+
+    document.getElementById('optimize-form').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      setStatus('loading', 'PROCESSING...');
+      const cameraId = document.getElementById('optimize-camera-select').value;
+      if (!cameraId) {
+        alert('Please select a camera');
+        return;
+      }
+
+      const camera = state.cameras.find(c => c.id === cameraId);
+      if (!camera) {
+        alert('Camera not found');
+        return;
+      }
+
+      setOptimizeStatus('loading', 'PROCESSING...');
       document.getElementById('generate-btn').disabled = true;
 
       try {
-        // Build request payload
         const request = {
           camera: {
-            id: document.getElementById('camera-id').value,
-            ip: document.getElementById('camera-ip').value,
-            location: document.getElementById('location').value,
-            vmsSystem: document.getElementById('vms-system').value,
+            id: camera.id,
+            ip: camera.ip,
+            location: camera.location,
+            vmsSystem: camera.vmsSystem || 'none',
             sceneType: document.getElementById('scene-type').value,
             purpose: document.getElementById('purpose').value,
-            vendor: "Generic",
-            model: "Unknown"
+            vendor: camera.vendor || 'Generic',
+            model: camera.model || 'Unknown'
           },
           capabilities: {
             maxResolution: "3840x2160",
@@ -736,29 +2070,18 @@
             hasLPRMode: false
           },
           currentSettings: {
-            stream: {
-              resolution: "1920x1080",
-              codec: "H.264",
-              fps: 30,
-              bitrateMbps: 6.0
-            },
-            exposure: {
-              shutter: "1/30",
-              wdr: "Off"
-            },
-            lowLight: {
-              irMode: "Auto"
-            }
+            stream: { resolution: "1920x1080", codec: "H.264", fps: 30, bitrateMbps: 6.0 },
+            exposure: { shutter: "1/30", wdr: "Off" },
+            lowLight: { irMode: "Auto" }
           },
           context: {
             bandwidthLimitMbps: parseFloat(document.getElementById('bandwidth').value),
             targetRetentionDays: parseInt(document.getElementById('retention').value),
             notes: `Lighting: ${document.getElementById('lighting').value}, Motion: ${document.getElementById('motion').value}`,
-            sampleFrame: sampleFrameBase64
+            sampleFrame: state.sampleFrameBase64
           }
         };
 
-        // Call API
         const response = await fetch(`${API_BASE}/api/optimize`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -771,27 +2094,35 @@
 
         const result = await response.json();
 
+        // Store optimization result
+        state.optimizations.push({
+          cameraId: camera.id,
+          timestamp: result.generatedAt || new Date().toISOString(),
+          confidence: result.confidence,
+          aiProvider: result.aiProvider,
+          settings: result.recommendedSettings,
+          explanation: result.explanation,
+          warnings: result.warnings || []
+        });
+        saveState();
+
         // Display result
-        displayResult(result);
-        setStatus('success', 'COMPLETE');
+        displayOptimizationResult(result);
+        setOptimizeStatus('success', 'COMPLETE');
 
       } catch (error) {
         console.error('Optimization error:', error);
-        document.getElementById('output').textContent =
+        document.getElementById('optimize-output').textContent =
           `// ERROR: ${error.message}\n\n` +
-          `// Check that backend is running at: ${API_BASE}\n` +
-          `// Start with: uvicorn main:app --reload`;
-        setStatus('error', 'ERROR');
+          `// Check that backend is running at: ${API_BASE}`;
+        setOptimizeStatus('error', 'ERROR');
       } finally {
         document.getElementById('generate-btn').disabled = false;
       }
     });
 
-    // Display optimization result
-    function displayResult(result) {
-      const output = document.getElementById('output');
-
-      // Format JSON with syntax highlighting
+    function displayOptimizationResult(result) {
+      const output = document.getElementById('optimize-output');
       const formatted = JSON.stringify(result, null, 2)
         .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
         .replace(/: "([^"]+)"/g, ': <span class="json-string">"$1"</span>')
@@ -799,13 +2130,305 @@
         .replace(/: (true|false)/g, ': <span class="json-bool">$1</span>');
 
       output.innerHTML = '// OPTIMIZATION RESULTS\n\n' + formatted;
-
-      // Scroll to top
       output.parentElement.scrollTop = 0;
     }
 
-    // Initialize
-    setStatus('', 'READY');
+    // ---- Results Detail Modal ----
+    function showOptimizationDetail(cameraId) {
+      const opt = state.optimizations.filter(o => o.cameraId === cameraId)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+      if (!opt) return;
+
+      const cam = state.cameras.find(c => c.id === cameraId) || {};
+      const modal = document.getElementById('detail-modal');
+      const title = document.getElementById('modal-title');
+      const body = document.getElementById('modal-body');
+
+      title.textContent = `${cameraId} - Optimization Details`;
+
+      const confPct = Math.round(opt.confidence * 100);
+      const confClass = confPct >= 80 ? 'confidence-high' : confPct >= 60 ? 'confidence-medium' : 'confidence-low';
+
+      body.innerHTML = `
+        <div class="form-section">
+          <div class="section-header">// Summary</div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Confidence</div>
+              <div class="${confClass}" style="font-size: 1.5rem;">${confPct}%</div>
+            </div>
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Provider</div>
+              <div style="font-size: 1rem;">${opt.aiProvider}</div>
+            </div>
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Date</div>
+              <div style="font-size: 1rem;">${new Date(opt.timestamp).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+
+        ${opt.explanation ? `
+        <div class="form-section">
+          <div class="section-header">// Explanation</div>
+          <div style="color: var(--text-primary); font-size: 0.85rem; line-height: 1.6;">${escapeHtml(opt.explanation)}</div>
+        </div>
+        ` : ''}
+
+        ${opt.warnings && opt.warnings.length > 0 ? `
+        <div class="form-section">
+          <div class="section-header">// Warnings</div>
+          <ul style="color: var(--amber-warning); font-size: 0.85rem; padding-left: 20px;">
+            ${opt.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        <div class="form-section">
+          <div class="section-header">// Recommended Settings</div>
+          <div class="output-terminal" style="max-height: 300px;">
+            <div class="output-content">${JSON.stringify(opt.settings, null, 2)}</div>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn" onclick="applySettings('${escapeHtml(cameraId)}')">Apply Settings</button>
+          <button class="btn btn-secondary" onclick="reoptimize('${escapeHtml(cameraId)}')">Re-optimize</button>
+        </div>
+      `;
+
+      modal.classList.add('active');
+    }
+
+    document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('detail-modal').classList.remove('active');
+    });
+
+    document.getElementById('detail-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'detail-modal') {
+        document.getElementById('detail-modal').classList.remove('active');
+      }
+    });
+
+    async function applySettings(cameraId) {
+      const cam = state.cameras.find(c => c.id === cameraId);
+      const opt = state.optimizations.filter(o => o.cameraId === cameraId)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+      if (!cam || !opt) {
+        alert('Camera or optimization not found');
+        return;
+      }
+
+      if (!confirm(`Apply settings to ${cameraId}?`)) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/apply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            camera: {
+              id: cam.id,
+              ip: cam.ip,
+              vmsSystem: cam.vmsSystem,
+              vmsCameraId: cam.vmsCameraId
+            },
+            settings: opt.settings,
+            applyVia: cam.vmsSystem === 'hanwha-wave' ? 'vms' : 'onvif',
+            verifyAfterApply: true
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'error') {
+          alert('Apply failed: ' + (result.error?.message || 'Unknown error'));
+        } else {
+          showToast('Settings applied successfully');
+        }
+
+      } catch (error) {
+        alert('Apply failed: ' + error.message);
+      }
+    }
+
+    function reoptimize(cameraId) {
+      document.getElementById('detail-modal').classList.remove('active');
+
+      // Switch to optimize section
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      document.querySelector('.nav-item[data-section="optimize"]').classList.add('active');
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById('section-optimize').classList.add('active');
+
+      // Select camera
+      document.getElementById('optimize-camera-select').value = cameraId;
+    }
+
+    // ---- Health Monitoring ----
+    document.getElementById('health-schedule-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const selectedCameras = [];
+      document.querySelectorAll('.health-camera-checkbox:checked').forEach(cb => {
+        selectedCameras.push(cb.value);
+      });
+
+      if (selectedCameras.length === 0) {
+        alert('Please select at least one camera');
+        return;
+      }
+
+      const interval = document.getElementById('health-interval').value;
+      const timeOfDay = document.getElementById('health-time').value;
+      const threshold = parseInt(document.getElementById('health-threshold').value);
+
+      // Create/update schedules
+      selectedCameras.forEach(cameraId => {
+        const existing = state.healthSchedules.findIndex(s => s.cameraId === cameraId);
+
+        const schedule = {
+          cameraId,
+          interval,
+          timeOfDay,
+          threshold,
+          enabled: true,
+          lastCheck: null,
+          nextCheck: calculateNextCheck(interval, timeOfDay),
+          lastHealth: null
+        };
+
+        if (existing >= 0) {
+          state.healthSchedules[existing] = { ...state.healthSchedules[existing], ...schedule };
+        } else {
+          state.healthSchedules.push(schedule);
+        }
+      });
+
+      saveState();
+      showToast('Health schedule saved');
+    });
+
+    function calculateNextCheck(interval, timeOfDay) {
+      const now = new Date();
+      const [hours, minutes] = timeOfDay.split(':').map(Number);
+      const next = new Date(now);
+      next.setHours(hours, minutes, 0, 0);
+
+      if (next <= now) {
+        if (interval === 'hourly') next.setHours(next.getHours() + 1);
+        else if (interval === 'daily') next.setDate(next.getDate() + 1);
+        else if (interval === 'weekly') next.setDate(next.getDate() + 7);
+      }
+
+      return next.toISOString();
+    }
+
+    document.getElementById('health-check-now-btn').addEventListener('click', async () => {
+      const selectedCameras = [];
+      document.querySelectorAll('.health-camera-checkbox:checked').forEach(cb => {
+        selectedCameras.push(cb.value);
+      });
+
+      if (selectedCameras.length === 0) {
+        alert('Please select at least one camera');
+        return;
+      }
+
+      showToast('Running health check...');
+
+      for (const cameraId of selectedCameras) {
+        const cam = state.cameras.find(c => c.id === cameraId);
+        if (!cam) continue;
+
+        try {
+          // Get last optimization for comparison
+          const lastOpt = state.optimizations.filter(o => o.cameraId === cameraId)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+          // Run a quick optimization check
+          const response = await fetch(`${API_BASE}/api/optimize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              camera: { id: cam.id, ip: cam.ip, sceneType: 'entrance', purpose: 'overview' },
+              capabilities: { maxResolution: "1920x1080", supportedCodecs: ["H.264"], maxFps: 30 },
+              currentSettings: { stream: {}, exposure: {}, lowLight: {} },
+              context: { bandwidthLimitMbps: 4.0, targetRetentionDays: 30 }
+            })
+          });
+
+          const result = await response.json();
+
+          // Update health schedule
+          const scheduleIdx = state.healthSchedules.findIndex(s => s.cameraId === cameraId);
+          const healthData = {
+            confidence: result.confidence,
+            driftDetected: lastOpt ? Math.abs(result.confidence - lastOpt.confidence) > 0.15 : false,
+            checkedAt: new Date().toISOString()
+          };
+
+          if (scheduleIdx >= 0) {
+            state.healthSchedules[scheduleIdx].lastCheck = new Date().toISOString();
+            state.healthSchedules[scheduleIdx].lastHealth = healthData;
+          } else {
+            state.healthSchedules.push({
+              cameraId,
+              interval: 'daily',
+              timeOfDay: '02:00',
+              threshold: 70,
+              enabled: false,
+              lastCheck: new Date().toISOString(),
+              nextCheck: null,
+              lastHealth: healthData
+            });
+          }
+
+        } catch (error) {
+          console.error('Health check failed for', cameraId, error);
+        }
+      }
+
+      saveState();
+      showToast('Health check complete');
+    });
+
+    // ---- Utilities ----
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showToast(message) {
+      // Simple toast notification
+      const toast = document.createElement('div');
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--orange-primary);
+        color: #000;
+        padding: 12px 20px;
+        font-size: 0.85rem;
+        font-weight: bold;
+        z-index: 1001;
+        animation: slideIn 0.3s ease;
+      `;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ---- Initialize ----
+    loadState();
   </script>
 </body>
 </html>
