@@ -1,0 +1,47 @@
+# CamOpt AI Backend Dependencies
+# Python 3.10+ required
+
+# ---- Core Framework ----
+fastapi==0.115.5
+uvicorn[standard]==0.34.0
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# ---- AI Integration ----
+anthropic==0.42.0  # Claude Vision API
+
+# ---- Database ----
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# ---- Image Processing ----
+pillow>=10.0.0  # Use >= for latest compatible version with pre-built wheels
+python-multipart==0.0.20  # File upload support
+
+# ---- Camera Integration ----
+onvif-zeep==0.2.12  # ONVIF protocol support
+zeep==4.3.1  # SOAP client for ONVIF
+WSDiscovery==2.0.0  # WS-Discovery for ONVIF camera discovery
+
+# ---- Configuration & Security ----
+python-dotenv==1.0.1
+python-jose[cryptography]==3.3.0  # JWT tokens (future auth)
+passlib[bcrypt]==1.7.4  # Password hashing (future auth)
+
+# ---- Utilities ----
+requests==2.32.3
+httpx==0.28.1  # Async HTTP client
+aiofiles==24.1.0  # Async file operations
+
+# ---- Development ----
+pytest==8.3.4
+pytest-asyncio==0.24.0
+black==24.10.0  # Code formatter
+ruff==0.8.4  # Linter
+
+# ---- Monitoring & Logging ----
+python-json-logger==3.2.1
+
+# ---- Production Database (Optional - uncomment if deploying to PostgreSQL) ----
+# psycopg2-binary==2.9.10  # PostgreSQL driver - only needed for production
+# For development, SQLite is used (no additional driver needed)

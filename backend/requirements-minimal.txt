@@ -1,0 +1,24 @@
+# Minimal requirements to get started quickly
+# Install these first, then add more later
+
+# Core framework
+fastapi==0.115.5
+uvicorn[standard]==0.34.0
+pydantic==2.10.3
+
+# AI Integration (main feature)
+anthropic==0.42.0
+
+# Database (SQLite - no binary dependencies)
+sqlalchemy==2.0.36
+
+# Image processing (will use pre-built wheel)
+pillow>=10.0.0
+python-multipart==0.0.20
+
+# Configuration
+python-dotenv==1.0.1
+
+# Utilities
+requests==2.32.3
+httpx==0.28.1
