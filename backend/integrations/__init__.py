@@ -1,4 +1,4 @@
 # backend/integrations/__init__.py
 """
-External API integrations for CamOpt AI
+External API integrations for PlatoniCam
 """

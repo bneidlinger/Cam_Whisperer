@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(venvScriptspip show wsdiscovery)",
-      "Bash(venv/Scripts/pip.exe:*)"
+      "Bash(venv/Scripts/pip.exe:*)",
+      "Bash(dir C:projectscam_whisperer)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

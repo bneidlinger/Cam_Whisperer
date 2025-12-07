@@ -1,17 +1,17 @@
 ```
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                                                                           ║
-║   ██████╗ █████╗ ███╗   ███╗ ██████╗ ██████╗ ████████╗    █████╗ ██╗      ║
-║  ██╔════╝██╔══██╗████╗ ████║██╔═══██╗██╔══██╗╚══██╔══╝   ██╔══██╗██║      ║
-║  ██║     ███████║██╔████╔██║██║   ██║██████╔╝   ██║      ███████║██║      ║
-║  ██║     ██╔══██║██║╚██╔╝██║██║   ██║██╔═══╝    ██║      ██╔══██║██║      ║
-║  ╚██████╗██║  ██║██║ ╚═╝ ██║╚██████╔╝██║        ██║      ██║  ██║██║      ║
-║   ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝        ╚═╝      ╚═╝  ╚═╝╚═╝      ║
-║                                                                           ║
-║                   CAMERA SETTINGS OPTIMIZATION SYSTEM                     ║
-║                              Version 0.2                                  ║
-║                                                                           ║
-╚═══════════════════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                   ║
+║  ██████╗ ██╗      █████╗ ████████╗ ██████╗ ███╗   ██╗██╗ ██████╗ █████╗ ███╗   ███╗║
+║  ██╔══██╗██║     ██╔══██╗╚══██╔══╝██╔═══██╗████╗  ██║██║██╔════╝██╔══██╗████╗ ████║║
+║  ██████╔╝██║     ███████║   ██║   ██║   ██║██╔██╗ ██║██║██║     ███████║██╔████╔██║║
+║  ██╔═══╝ ██║     ██╔══██║   ██║   ██║   ██║██║╚██╗██║██║██║     ██╔══██║██║╚██╔╝██║║
+║  ██║     ███████╗██║  ██║   ██║   ╚██████╔╝██║ ╚████║██║╚██████╗██║  ██║██║ ╚═╝ ██║║
+║  ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═══╝╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝║
+║                                                                                   ║
+║                      CAMERA SETTINGS OPTIMIZATION SYSTEM                          ║
+║                                 Version 0.4                                       ║
+║                                                                                   ║
+╚═══════════════════════════════════════════════════════════════════════════════════╝
 
 CLASSIFICATION: UNCLASSIFIED / INTEGRATOR USE ONLY
 SYSTEM TYPE:    Video Management System Configuration Assistant
@@ -26,7 +26,7 @@ STATUS:         TESTING PHASE - CLAUDE VISION AI ACTIVE
 
 > **Every camera has a platonic state, and it actually can and should be achieved at all times.**
 
-The gap between factory defaults and optimal field performance is where 70% of video surveillance failures occur. CamOpt AI exists to close that gap.
+The gap between factory defaults and optimal field performance is where 70% of video surveillance failures occur. PlatoniCam exists to close that gap.
 
 ## PROBLEM OVERVIEW
 
@@ -50,7 +50,7 @@ The gap between factory defaults and optimal field performance is where 70% of v
 
 ## SOLUTION ARCHITECTURE
 
-CamOpt AI provides integrators with **AI-powered configuration recommendations** based on:
+PlatoniCam provides integrators with **AI-powered configuration recommendations** based on:
 
 - **Scene Classification** (hallway, parking lot, entrance, perimeter, etc.)
 - **Operational Purpose** (overview, face recognition, license plate capture, evidence-grade)
@@ -282,7 +282,7 @@ The concept of the **platonic camera state** acknowledges that:
 4. Factory defaults are, by definition, suboptimal for any specific deployment
 5. Integrator expertise should be encoded, not rediscovered on every job
 
-CamOpt AI is the first step toward **universal camera optimization** - where every camera, everywhere, operates at its theoretical best.
+PlatoniCam is the first step toward **universal camera optimization** - where every camera, everywhere, operates at its theoretical best.
 
 ---
 
@@ -307,14 +307,14 @@ CamOpt AI is the first step toward **universal camera optimization** - where eve
 
 ## LICENSE
 
-CamOpt AI is dual-licensed:
+PlatoniCam is dual-licensed:
 
 **Open Source:** AGPL v3 (see [LICENSE](LICENSE))
 
 **Commercial:** Available upon request for integrators, OEMs, VARs, and SaaS deployments (see [COMMERCIAL.md](COMMERCIAL.md))
 
 ```
-Copyright 2025 CamOpt AI Contributors
+Copyright 2025 PlatoniCam Contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -335,11 +335,12 @@ For issues, feature requests, or integration questions, file a report via GitHub
 
 ### Additional Documentation
 
-- `QUICKSTART.md` - 15-minute setup guide
+- `docs/QUICKSTART.md` - 15-minute setup guide
+- `docs/ARCHITECTURE.md` - System architecture diagrams
+- `docs/API_SPECIFICATION.md` - Complete API reference
+- `docs/DEVELOPMENT_PLAN.md` - Development roadmap
 - `backend/README.md` - Backend development guide
-- `backend/ARCHITECTURE.md` - System architecture diagrams
-- `backend/API_SPECIFICATION.md` - Complete API reference
-- `backend/ai_outputs/README.md` - Test tracking workflow
+- `tests/` - Test suite and utilities
 
 ---
 

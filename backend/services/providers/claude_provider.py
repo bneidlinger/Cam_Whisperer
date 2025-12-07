@@ -1,0 +1,276 @@
+# backend/services/providers/claude_provider.py
+"""
+Claude AI optimization provider.
+
+Uses Anthropic's Claude Vision API to analyze camera scenes
+and generate optimal settings.
+"""
+
+import logging
+from datetime import datetime
+from typing import Optional, List
+
+from .base import OptimizationProvider, ProviderInfo, ProviderCapability
+from models import (
+    CameraContext,
+    CameraCapabilities,
+    CameraCurrentSettings,
+    OptimizationContext,
+    OptimizationResult,
+    RecommendedSettings,
+    StreamSettings,
+    ExposureSettings,
+    LowLightSettings,
+    ImageSettings,
+)
+from models.pipeline import PipelineContext
+from errors import (
+    ProviderError,
+    ProviderRateLimitError,
+    ProviderAuthError,
+    InvalidResponseError,
+)
+from config import get_settings
+
+# Lazy imports to avoid circular dependencies when anthropic is not installed
+ClaudeClient = None
+
+def _get_claude_client():
+    """Lazy load Claude client"""
+    global ClaudeClient
+    try:
+        from integrations.claude_client import get_claude_client, ClaudeClient as CC
+        ClaudeClient = CC
+        return get_claude_client()
+    except ImportError:
+        return None
+
+logger = logging.getLogger(__name__)
+
+
+class ClaudeOptimizationProvider(OptimizationProvider):
+    """
+    Claude Vision AI optimization provider.
+
+    Analyzes sample frames and camera context to generate
+    optimal settings using scene understanding.
+    """
+
+    def __init__(self, client=None):
+        """
+        Initialize Claude provider.
+
+        Args:
+            client: Optional ClaudeClient instance (uses singleton if not provided)
+        """
+        self._client = client
+        self._settings = get_settings()
+
+    @property
+    def client(self):
+        """Lazy-load Claude client"""
+        if self._client is None:
+            self._client = _get_claude_client()
+        return self._client
+
+    @property
+    def info(self) -> ProviderInfo:
+        return ProviderInfo(
+            name="claude",
+            version="sonnet-4-5",
+            capabilities=[
+                ProviderCapability.SCENE_ANALYSIS,
+                ProviderCapability.CONSTRAINT_SOLVING,
+            ],
+            requires_api_key=True,
+            supports_fallback=True,
+            description="Claude Vision AI for intelligent scene-based optimization",
+        )
+
+    def is_available(self) -> bool:
+        """Check if Claude API is available"""
+        try:
+            return self.client is not None and self._settings.anthropic_api_key
+        except Exception:
+            return False
+
+    async def optimize(
+        self,
+        camera: CameraContext,
+        capabilities: CameraCapabilities,
+        current_settings: Optional[CameraCurrentSettings],
+        context: OptimizationContext,
+        pipeline: Optional[PipelineContext] = None,
+    ) -> OptimizationResult:
+        """
+        Generate optimal settings using Claude Vision AI.
+
+        Analyzes the sample frame (if provided) along with camera context
+        to produce scene-aware recommendations.
+        """
+        start_time = datetime.utcnow()
+
+        try:
+            # Build inputs for Claude client
+            camera_dict = {
+                "id": camera.id,
+                "sceneType": camera.scene_type.value if camera.scene_type else None,
+                "purpose": camera.purpose.value if camera.purpose else None,
+                "location": camera.location,
+                "manufacturer": camera.manufacturer,
+                "model": camera.model,
+            }
+
+            current_dict = current_settings.to_dict() if current_settings else {}
+            capabilities_dict = capabilities.to_dict()
+
+            constraints = {
+                "bandwidthLimitMbps": context.bandwidth_limit_mbps,
+                "targetRetentionDays": context.target_retention_days,
+            }
+
+            # Call Claude API
+            recommended_dict, confidence, explanation = (
+                self.client.optimize_camera_settings(
+                    camera_context=camera_dict,
+                    current_settings=current_dict,
+                    capabilities=capabilities_dict,
+                    constraints=constraints,
+                    sample_frame=context.sample_frame,
+                )
+            )
+
+            # Parse response into typed settings
+            recommended = self._parse_recommended_settings(recommended_dict)
+
+            # Generate warnings
+            warnings = self._generate_warnings(recommended, capabilities, context)
+
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+
+            if pipeline:
+                pipeline.record_stage_time("optimization", processing_time)
+
+            return OptimizationResult(
+                camera_id=camera.id,
+                recommended_settings=recommended,
+                confidence=confidence,
+                explanation=explanation,
+                warnings=warnings,
+                provider="claude-sonnet-4-5",
+                processing_time_seconds=processing_time,
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Claude optimization error: {error_msg}", exc_info=True)
+
+            # Map to specific error types
+            if "rate_limit" in error_msg.lower() or "429" in error_msg:
+                raise ProviderRateLimitError(provider="claude")
+            elif "auth" in error_msg.lower() or "401" in error_msg:
+                raise ProviderAuthError(provider="claude")
+            elif "invalid" in error_msg.lower() or "parse" in error_msg.lower():
+                raise InvalidResponseError(message=error_msg)
+            else:
+                raise ProviderError(
+                    provider="claude",
+                    message=error_msg,
+                )
+
+    def _parse_recommended_settings(self, settings_dict: dict) -> RecommendedSettings:
+        """Parse raw settings dict into typed RecommendedSettings"""
+
+        stream = None
+        if "stream" in settings_dict:
+            s = settings_dict["stream"]
+            stream = StreamSettings(
+                resolution=s.get("resolution"),
+                fps=s.get("fps"),
+                codec=s.get("codec"),
+                bitrate_mode=s.get("bitrateMode"),
+                bitrate_mbps=s.get("bitrateMbps"),
+                gop_seconds=s.get("gopSeconds"),
+                profile=s.get("profile"),
+            )
+
+        exposure = None
+        if "exposure" in settings_dict:
+            e = settings_dict["exposure"]
+            exposure = ExposureSettings(
+                mode=e.get("mode"),
+                shutter=e.get("shutter"),
+                gain_limit=e.get("gainLimit"),
+                wdr=e.get("wdr"),
+                blc=e.get("blc"),
+                hlc=e.get("hlc"),
+            )
+
+        low_light = None
+        if "lowLight" in settings_dict:
+            ll = settings_dict["lowLight"]
+            low_light = LowLightSettings(
+                mode=ll.get("mode"),
+                ir_mode=ll.get("irMode"),
+                ir_level=ll.get("irLevel"),
+                sensitivity=ll.get("sensitivity"),
+                slow_shutter=ll.get("slowShutter"),
+                dnr=ll.get("dnr"),
+            )
+
+        image = None
+        if "image" in settings_dict:
+            i = settings_dict["image"]
+            image = ImageSettings(
+                brightness=i.get("brightness"),
+                contrast=i.get("contrast"),
+                saturation=i.get("saturation"),
+                sharpness=i.get("sharpness"),
+                white_balance=i.get("whiteBalance"),
+                defog=i.get("defog"),
+            )
+
+        return RecommendedSettings(
+            stream=stream,
+            exposure=exposure,
+            low_light=low_light,
+            image=image,
+        )
+
+    def _generate_warnings(
+        self,
+        settings: RecommendedSettings,
+        capabilities: CameraCapabilities,
+        context: OptimizationContext,
+    ) -> List[str]:
+        """Generate warnings for constraint violations"""
+
+        warnings = []
+
+        # Check bandwidth
+        if context.bandwidth_limit_mbps and settings.stream:
+            if settings.stream.bitrate_mbps:
+                if settings.stream.bitrate_mbps > context.bandwidth_limit_mbps:
+                    warnings.append(
+                        f"Recommended bitrate ({settings.stream.bitrate_mbps} Mbps) "
+                        f"exceeds bandwidth limit ({context.bandwidth_limit_mbps} Mbps). "
+                        "Consider reducing resolution or FPS."
+                    )
+
+        # Check FPS capability
+        if settings.stream and settings.stream.fps:
+            if settings.stream.fps > capabilities.max_fps:
+                warnings.append(
+                    f"Recommended FPS ({settings.stream.fps}) exceeds "
+                    f"camera maximum ({capabilities.max_fps})"
+                )
+
+        # Check codec support
+        if settings.stream and settings.stream.codec:
+            if settings.stream.codec not in capabilities.supported_codecs:
+                warnings.append(
+                    f"Recommended codec ({settings.stream.codec}) may not be supported. "
+                    f"Camera supports: {', '.join(capabilities.supported_codecs)}"
+                )
+
+        return warnings

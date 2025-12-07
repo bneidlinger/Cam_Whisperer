@@ -23,8 +23,8 @@ settings = get_settings()
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="CamOpt AI Backend",
-    version="0.2.0-alpha",
+    title="PlatoniCam Backend",
+    version="0.4.0",
     description="AI-powered camera optimization with Claude Vision and ONVIF integration"
 )
 
@@ -43,7 +43,7 @@ app.add_middleware(
 async def startup_event():
     """Application startup"""
     logger.info("=" * 60)
-    logger.info("CamOpt AI Backend Starting")
+    logger.info("PlatoniCam Backend Starting")
     logger.info("=" * 60)
     logger.info(f"Environment: {settings.app_env}")
     logger.info(f"Claude Model: {settings.claude_model}")

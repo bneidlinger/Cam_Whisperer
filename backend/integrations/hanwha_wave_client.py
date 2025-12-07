@@ -254,7 +254,7 @@ class HanwhaWAVEClient:
 
     def _normalize_camera_data(self, cam: Dict) -> Dict:
         """
-        Normalize WAVE camera data to CamOpt format
+        Normalize WAVE camera data to PlatoniCam format
 
         Args:
             cam: Raw camera data from WAVE API
@@ -354,7 +354,7 @@ class HanwhaWAVEClient:
             camera: Raw camera object from WAVE
 
         Returns:
-            Settings in CamOpt format
+            Settings in PlatoniCam format
         """
         # WAVE stores settings differently than ONVIF
         # Settings may be in: streamSettings, advanced, recording, etc.
@@ -362,7 +362,7 @@ class HanwhaWAVEClient:
         stream_settings = camera.get("streamSettings", {})
         recording_settings = camera.get("recordingSettings", {})
 
-        # Build CamOpt format settings
+        # Build PlatoniCam format settings
         return {
             "stream": {
                 "resolution": stream_settings.get("resolution", "1920x1080"),
@@ -402,7 +402,7 @@ class HanwhaWAVEClient:
 
         Args:
             camera_id: WAVE camera ID
-            settings: Settings to apply (CamOpt format)
+            settings: Settings to apply (PlatoniCam format)
 
         Returns:
             True if successful, False otherwise
@@ -412,7 +412,7 @@ class HanwhaWAVEClient:
         try:
             loop = asyncio.get_event_loop()
 
-            # Convert CamOpt format to WAVE format
+            # Convert PlatoniCam format to WAVE format
             wave_settings = self._convert_to_wave_format(settings)
 
             # Apply settings via WAVE API
@@ -435,10 +435,10 @@ class HanwhaWAVEClient:
 
     def _convert_to_wave_format(self, settings: Dict) -> Dict:
         """
-        Convert CamOpt settings format to WAVE API format
+        Convert PlatoniCam settings format to WAVE API format
 
         Args:
-            settings: CamOpt format settings
+            settings: PlatoniCam format settings
 
         Returns:
             WAVE API format settings

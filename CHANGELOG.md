@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to CamOpt AI will be documented in this file.
+All notable changes to PlatoniCam will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,26 +9,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned for v0.4.0
-- Database layer implementation (PostgreSQL/SQLite)
-- Camera inventory persistence
-- Optimization history storage
-- User authentication (JWT)
-- Production deployment (Render/Railway)
-- Complete imaging settings apply (video source token integration)
+---
 
-### Planned for v0.5.0
-- Camera health monitoring
-- Periodic snapshot capture
-- Configuration drift detection
-- Automated re-optimization triggers
-- Multi-camera site optimization
+## [0.4.0] - 2025-12-07
 
-### Planned for v0.6.0
-- VMS SDK integration (Genetec, Milestone, Avigilon)
-- Advanced analytics and reporting
-- Fleet management dashboard
-- Mobile-responsive UI
+### Added
+
+#### Optimization Pipeline Infrastructure
+- **Added** Complete pipeline data models (`backend/models/pipeline.py`)
+  - Enums: `SceneType` (17 types), `CameraPurpose` (9 types), `ApplyMethod`, `ApplyStatus`
+  - Camera models: `DiscoveredCamera`, `CameraCapabilities` with `from_dict()`/`to_dict()`
+  - Settings models: `StreamSettings`, `ExposureSettings`, `LowLightSettings`, `ImageSettings`
+  - Optimization models: `CameraContext`, `OptimizationContext`, `RecommendedSettings`, `OptimizationResult`
+  - Apply models: `ApplyRequest`, `VerificationResult`, `ApplyResult`
+  - `PipelineContext` class for request tracking, timing, and error accumulation
+
+- **Added** Exception hierarchy with recovery hints (`backend/errors.py`)
+  - Base: `PlatoniCamError` with `recoverable` flag and `recovery_hint`
+  - Pipeline: `PipelineError` with stage tracking
+  - Discovery: `DiscoveryError`, `NetworkScanError`, `VmsConnectionError`
+  - Capability: `CapabilityQueryError`, `UnsupportedProtocolError`
+  - Optimization: `OptimizationError`, `ProviderError`, `ProviderRateLimitError`, `ProviderAuthError`, `InvalidResponseError`, `ConstraintViolationError`
+  - Apply: `ApplyError`, `PartialApplyError`, `ApplyTimeoutError`, `ApplyRollbackError`
+  - Verification: `VerificationError`
+  - Auth: `AuthenticationError`, `CameraAuthError`, `VmsAuthError`
+  - Config: `ConfigurationError`, `MissingApiKeyError`
+
+- **Added** Provider abstraction layer (`backend/services/providers/`)
+  - `OptimizationProvider` abstract base class with capabilities
+  - `ClaudeOptimizationProvider` - Claude Vision AI provider
+  - `HeuristicOptimizationProvider` - Rule-based fallback with scene/purpose rules
+  - `ProviderFactory` with auto-selection and fallback support
+  - `ProviderCapability` enum: `SCENE_ANALYSIS`, `MULTI_CAMERA`, `CONSTRAINT_SOLVING`, `LEARNING`, `OFFLINE`
+
+- **Added** Pipeline logging and metrics (`backend/services/pipeline_logger.py`)
+  - `PipelineLogger` for structured request-scoped logging
+  - `StageMetrics` and `PipelineMetrics` for timing
+  - `@timed_stage` decorator for async functions
+  - `configure_pipeline_logging()` setup function
+
+#### Heuristic Provider Rules
+- **Added** Purpose-based optimization rules (7 purposes)
+  - PLATES: Fast shutter (1/250-1/500), 20+ FPS, slow shutter off
+  - FACIAL: Fast shutter (1/250), 20+ FPS
+  - EVIDENCE: CBR bitrate mode, H.265 codec
+  - COUNTING, INTRUSION, GENERAL: Balanced settings
+
+- **Added** Scene-type optimization rules (14 scenes)
+  - ENTRANCE, LOBBY, LOADING_DOCK: High WDR
+  - PARKING: Medium WDR, Auto IR
+  - EXTERIOR_NIGHT: Auto IR, High DNR
+  - RETAIL: Medium WDR, enhanced saturation
+  - ATM, CASH_REGISTER: High WDR, fast shutter
+
+### Changed
+
+#### Refactored OptimizationService
+- **Refactored** `backend/services/optimization.py` to use provider abstraction
+- **Added** `optimize_typed()` method for typed interface
+- **Maintained** Backward compatibility with dict-based `optimize()` method
+- **Added** Automatic provider fallback on failure
+- **Added** Pipeline error tracking in responses
+
+### Technical Details
+
+**New Files:**
+- `backend/models/__init__.py` - Package exports
+- `backend/models/pipeline.py` - ~600 lines of data models
+- `backend/errors.py` - ~460 lines of exception hierarchy
+- `backend/services/providers/__init__.py` - Package exports
+- `backend/services/providers/base.py` - Abstract provider class
+- `backend/services/providers/claude_provider.py` - Claude AI provider
+- `backend/services/providers/heuristic_provider.py` - Rule-based provider
+- `backend/services/providers/factory.py` - Provider factory
+- `backend/services/pipeline_logger.py` - Logging infrastructure
+
+**Code Metrics:**
+- Models: ~600 lines
+- Errors: ~460 lines
+- Providers: ~650 lines
+- Logger: ~200 lines
+- Service refactor: ~100 lines
+- **Total: ~2,010 new lines**
+
+---
+
+## [0.3.2] - 2025-12-07
+
+### Changed
+
+#### Rebranding
+- **Renamed** Project from "CamOpt AI" to "PlatoniCam"
+- **Updated** All frontend branding (title, headers)
+- **Updated** Backend API title and startup messages
+- **Updated** All documentation references
+- **Changed** localStorage key from `camopt_state` to `platonicam_state`
+- **Changed** Default database name from `camopt.db` to `platonicam.db`
+
+#### Project Organization
+- **Created** `docs/` folder - consolidated all documentation
+- **Created** `tests/` folder with pytest structure
+- **Moved** All markdown docs to `docs/` directory
+- **Moved** Test scripts and utilities to `tests/backend/`
+- **Added** `docs/README.md` - documentation index
+- **Added** `tests/README.md` - test suite documentation
+- **Added** `tests/conftest.py` - pytest fixtures
+- **Added** `tests/backend/test_optimization.py` - unit tests for optimization service
+
+#### UI Improvements
+- **Added** Clean settings report display for optimization results
+- **Added** Organized settings by category (Stream, Exposure, Low-Light, Image, Focus)
+- **Added** Report header with confidence, provider, and processing time
+- **Added** "Copy JSON" button in optimization detail modal
+- **Improved** Detail modal with structured settings layout
+
+---
+
+## [0.3.1] - 2025-12-07
+
+### Added
+
+#### Sites/Projects Feature
+- **Added** Site management system for organizing cameras into logical groups
+- **Added** Create, switch, and delete sites via header controls
+- **Added** JSON export - save any site to a `.json` file for backup/portability
+- **Added** JSON import - load site files with duplicate detection (replace or create copy)
+- **Added** Automatic data migration from legacy flat state to site-based structure
+- **Added** Site selector dropdown in header with camera counts
+- **Added** Per-site isolation of cameras, optimizations, and health schedules
+- **Added** Support for same camera IP in multiple sites (different deployments)
+
+**UI Changes:**
+- Site controls in header: selector, [+] NEW, [S] SAVE, [L] LOAD, [X] DEL
+- Create/Edit Site modal with name and description
+- Empty state messages when no site selected
+- Camera count badges per site in selector
+
+**Data Model:**
+```javascript
+{
+  id: "uuid",
+  name: "Site Name",
+  description: "Optional",
+  createdAt: "ISO8601",
+  updatedAt: "ISO8601",
+  cameras: [...],
+  optimizations: [...],
+  healthSchedules: [...]
+}
+```
+
+#### Licensing
+- **Added** Dual licensing model (AGPL v3 + Commercial)
+- **Added** `LICENSE` file with GNU AGPL v3
+- **Added** `COMMERCIAL.md` with commercial licensing info
+- **Updated** README with license badges and dual-license section
+
+### Changed
+- **Refactored** State management to site-based architecture
+- **Updated** All camera/optimization/health operations to use site context
+- **Updated** localStorage schema (auto-migrates from legacy format)
+
+### Fixed
+- Camera imports now validate site exists before adding
 
 ---
 
@@ -457,7 +600,10 @@ None - First alpha release
 
 ## Version History
 
-- **v0.3.0** (2025-12-06) - Hanwha WAVE VMS Integration [Current]
+- **v0.4.0** (2025-12-07) - Optimization Pipeline Infrastructure [Current]
+- **v0.3.2** (2025-12-07) - Rebrand to PlatoniCam + Project Organization
+- **v0.3.1** (2025-12-07) - Sites/Projects + Dual Licensing
+- **v0.3.0** (2025-12-06) - Hanwha WAVE VMS Integration
 - **v0.2.0-alpha** (2025-12-06) - AI + ONVIF Integration
 - **v0.1.0** (2025-12-05) - Initial Static Prototype
 
@@ -506,6 +652,6 @@ None - First alpha release
 
 ---
 
-**Maintained by:** CamOpt AI Development Team
-**Last Updated:** 2025-12-06
-**Current Version:** 0.3.0
+**Maintained by:** PlatoniCam Development Team
+**Last Updated:** 2025-12-07
+**Current Version:** 0.4.0

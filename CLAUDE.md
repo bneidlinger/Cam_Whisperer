@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**CamOpt AI** (v0.2) is a camera settings optimization system for surveillance/VMS deployments. It generates optimal camera configurations based on scene type, lighting, and operational requirements using Claude Vision AI with heuristic fallback.
+**PlatoniCam** (v0.3.2) is a camera settings optimization system for surveillance/VMS deployments. It generates optimal camera configurations based on scene type, lighting, and operational requirements using Claude Vision AI with heuristic fallback.
+
+**License:** Dual-licensed under AGPL v3 (open source) and Commercial (see `COMMERCIAL.md`).
 
 ## Architecture
 
@@ -23,6 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Single `index.html` with embedded CSS/JavaScript (vanilla, no frameworks)
 - Deployed via GitHub Pages
 - Contains fallback heuristic engine (`basicHeuristicEngine` function)
+- **Sites/Projects system** for organizing cameras (localStorage + JSON export/import)
 
 ### Backend (`backend/`)
 - **Framework**: FastAPI (Python 3.10+)
@@ -64,9 +67,10 @@ cp .env.example .env   # Edit and add ANTHROPIC_API_KEY
 # Run development server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Run tests
-pytest
-pytest tests/test_optimization.py  # Single file
+# Run tests (from project root)
+cd ..
+pytest tests/
+pytest tests/backend/test_optimization.py  # Single file
 
 # Code formatting
 black .
@@ -93,6 +97,37 @@ Backend: See `backend/README.md` for Render/Railway deployment
 | `/api/wave/cameras/{id}/current-settings` | GET | Query current settings via WAVE |
 
 API docs: `http://localhost:8000/docs` (Swagger UI)
+
+## Sites/Projects System
+
+The frontend organizes cameras into **Sites** (projects/groups). Each site contains its own cameras, optimizations, and health schedules.
+
+### Site Data Model (localStorage)
+```javascript
+{
+  id: "uuid",
+  name: "Site Name",
+  description: "Optional",
+  createdAt: "ISO8601",
+  updatedAt: "ISO8601",
+  cameras: [...],
+  optimizations: [...],
+  healthSchedules: [...]
+}
+```
+
+### Key Functions (in `index.html`)
+- `getCurrentSite()` - Returns active site object
+- `getCurrentCameras()` - Returns cameras for active site
+- `addCameraToCurrentSite(camera)` - Adds camera with validation
+- `createSite(name, description)` - Creates new site
+- `exportCurrentSite()` - Downloads site as JSON
+- `importSiteFromFile(file)` - Loads site from JSON
+
+### Adding Site Features
+1. Site state is in `state.sites[]` and `state.currentSiteId`
+2. All camera/optimization access must use helper functions (not direct `state.cameras`)
+3. Site data persists to localStorage key `platonicam_state`
 
 ## Code Modification Guidelines
 
@@ -125,7 +160,7 @@ Optional (with defaults):
 APP_ENV=development
 CLAUDE_MODEL=claude-sonnet-4-5-20250929
 FALLBACK_TO_HEURISTIC=true         # Fall back to heuristic if AI fails
-DATABASE_URL=sqlite:///./camopt.db
+DATABASE_URL=sqlite:///./platonicam.db
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,file://
 ONVIF_TIMEOUT_SECONDS=10
 AI_OPTIMIZATION_TIMEOUT_SECONDS=30

@@ -2,7 +2,7 @@
 Simple ONVIF Mock Server for Testing
 
 This creates a basic HTTP server that responds to ONVIF queries
-for testing the CamOpt AI ONVIF integration without real hardware.
+for testing the PlatoniCam ONVIF integration without real hardware.
 
 Usage:
     python onvif_mock_server.py
@@ -36,7 +36,7 @@ class ONVIFMockHandler(BaseHTTPRequestHandler):
         response = {
             "status": "online",
             "message": "ONVIF Mock Camera",
-            "manufacturer": "CamOpt AI",
+            "manufacturer": "PlatoniCam",
             "model": "Mock-Camera-1080p",
             "firmware": "1.0.0",
             "endpoints": {
@@ -66,7 +66,7 @@ class ONVIFMockHandler(BaseHTTPRequestHandler):
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
     <SOAP-ENV:Body>
         <tds:GetDeviceInformationResponse>
-            <tds:Manufacturer>CamOpt AI</tds:Manufacturer>
+            <tds:Manufacturer>PlatoniCam</tds:Manufacturer>
             <tds:Model>Mock-Camera-1080p</tds:Model>
             <tds:FirmwareVersion>1.0.0</tds:FirmwareVersion>
             <tds:SerialNumber>MOCK-12345</tds:SerialNumber>
@@ -92,7 +92,7 @@ def run_server(port=8080):
     print(f"  Port:     {port}")
     print(f"  Username: admin")
     print(f"  Password: admin")
-    print("\nManufacturer: CamOpt AI")
+    print("\nManufacturer: PlatoniCam")
     print("Model:        Mock-Camera-1080p")
     print("\nPress Ctrl+C to stop")
     print("=" * 60)

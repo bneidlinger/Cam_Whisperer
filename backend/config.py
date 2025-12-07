@@ -1,6 +1,6 @@
 # backend/config.py
 """
-Configuration management for CamOpt AI Backend
+Configuration management for PlatoniCam Backend
 Loads settings from environment variables
 """
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     claude_temperature: float = 0.7
 
     # Database
-    database_url: str = "sqlite:///./camopt.db"
+    database_url: str = "sqlite:///./platonicam.db"
 
     # File Storage
     upload_dir: str = "./uploads"

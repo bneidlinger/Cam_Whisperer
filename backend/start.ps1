@@ -1,4 +1,4 @@
-# CamOpt AI v0.2 - Startup Script (PowerShell)
+# PlatoniCam - Startup Script (PowerShell)
 
 $ErrorActionPreference = "Stop"
 
@@ -11,7 +11,7 @@ Set-Location $ScriptDir
 
 Write-Host ""
 Write-Host " ============================================================" -ForegroundColor Cyan
-Write-Host "  CAMOPT AI v0.2 - STARTUP SEQUENCE" -ForegroundColor Cyan
+Write-Host "  PlatoniCam - STARTUP SEQUENCE" -ForegroundColor Cyan
 Write-Host " ============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -114,7 +114,7 @@ Start-Process "http://localhost:3000"
 
 Write-Host ""
 Write-Host " ============================================================" -ForegroundColor Cyan
-Write-Host "  CAMOPT AI SERVICES RUNNING" -ForegroundColor Cyan
+Write-Host "  PlatoniCam SERVICES RUNNING" -ForegroundColor Cyan
 Write-Host " ============================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Frontend:  " -NoNewline; Write-Host "http://localhost:3000" -ForegroundColor Green
