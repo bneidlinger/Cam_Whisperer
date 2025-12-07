@@ -19,6 +19,8 @@ DATE:           2025-CURRENT
 STATUS:         TESTING PHASE - CLAUDE VISION AI ACTIVE
 ```
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 ## MISSION STATEMENT
 
 > **Every camera has a platonic state, and it actually can and should be achieved at all times.**
@@ -304,7 +306,17 @@ CamOpt AI is the first step toward **universal camera optimization** - where eve
 
 ## LICENSE
 
-[Specify license here]
+This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
+
+```
+Copyright 2025 CamOpt AI Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+```
 
 ## CONTACT
 

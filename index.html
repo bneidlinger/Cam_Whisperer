@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>CAMOPT v0.2 // SECURITY SYSTEMS OPTIMIZATION TERMINAL</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📷</text></svg>" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -859,6 +860,90 @@
         justify-content: center;
         padding: 14px 10px;
       }
+      .site-controls {
+        display: none;
+      }
+    }
+
+    /* Site Controls */
+    .site-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: 30px;
+      padding-left: 20px;
+      border-left: 1px solid var(--orange-dark);
+    }
+
+    .site-selector {
+      background: var(--bg-secondary);
+      border: 1px solid var(--orange-dark);
+      color: var(--text-orange);
+      padding: 6px 12px;
+      min-width: 180px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .site-selector:focus {
+      outline: none;
+      border-color: var(--orange-primary);
+      box-shadow: 0 0 10px rgba(255, 107, 26, 0.2);
+    }
+
+    .site-selector option {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .site-btn {
+      background: var(--bg-secondary);
+      border: 1px solid var(--orange-dark);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-family: 'Share Tech Mono', monospace;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .site-btn:hover {
+      border-color: var(--orange-primary);
+      color: var(--orange-glow);
+      box-shadow: 0 0 10px rgba(255, 107, 26, 0.2);
+    }
+
+    .site-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .site-name-display {
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* Site Modal specific styles */
+    .site-modal-input {
+      width: 100%;
+      margin-bottom: 15px;
+    }
+
+    .site-modal-textarea {
+      width: 100%;
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    /* Hidden file input for site import */
+    #site-import-input {
+      display: none;
     }
   </style>
 </head>
@@ -866,11 +951,21 @@
   <div class="app-container">
     <!-- Terminal Header -->
     <header class="terminal-header">
-      <div>
+      <div style="display: flex; align-items: center;">
         <div class="system-title">
           <span class="status-indicator"></span>
           CAMOPT v0.2 // SURVEILLANCE OPTIMIZATION
         </div>
+        <div class="site-controls">
+          <select class="site-selector" id="site-selector" title="Select Site">
+            <option value="">-- No Site --</option>
+          </select>
+          <button class="site-btn" id="new-site-btn" title="Create New Site">[+] NEW</button>
+          <button class="site-btn" id="save-site-btn" title="Export Site to JSON" disabled>[S] SAVE</button>
+          <button class="site-btn" id="load-site-btn" title="Import Site from JSON">[L] LOAD</button>
+          <button class="site-btn" id="delete-site-btn" title="Delete Current Site" disabled>[X] DEL</button>
+        </div>
+        <input type="file" id="site-import-input" accept=".json" />
       </div>
       <div class="header-stats">
         <div class="header-stat">
@@ -1023,30 +1118,32 @@
             <!-- WAVE VMS -->
             <div class="sub-content" id="subtab-wave">
               <div class="panel-body">
-                <div class="form-section">
-                  <div class="section-header">// WAVE Server Connection</div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Server IP</label>
-                      <input type="text" id="wave-server-ip" placeholder="192.168.1.50" />
+                <form id="wave-connect-form" autocomplete="off">
+                  <div class="form-section">
+                    <div class="section-header">// WAVE Server Connection</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label for="wave-server-ip">Server IP</label>
+                        <input type="text" id="wave-server-ip" placeholder="192.168.1.50" autocomplete="off" />
+                      </div>
+                      <div class="form-group">
+                        <label for="wave-port">Port</label>
+                        <input type="number" id="wave-port" value="7001" />
+                      </div>
                     </div>
-                    <div class="form-group">
-                      <label>Port</label>
-                      <input type="number" id="wave-port" value="7001" />
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label for="wave-username">Username</label>
+                        <input type="text" id="wave-username" value="admin" autocomplete="username" />
+                      </div>
+                      <div class="form-group">
+                        <label for="wave-password">Password</label>
+                        <input type="password" id="wave-password" autocomplete="current-password" />
+                      </div>
                     </div>
+                    <button type="submit" class="btn" id="wave-connect-btn">Connect to WAVE</button>
                   </div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Username</label>
-                      <input type="text" id="wave-username" value="admin" />
-                    </div>
-                    <div class="form-group">
-                      <label>Password</label>
-                      <input type="password" id="wave-password" />
-                    </div>
-                  </div>
-                  <button type="button" class="btn" id="wave-connect-btn">Connect to WAVE</button>
-                </div>
+                </form>
 
                 <div class="form-section" id="wave-results" style="display: none;">
                   <div class="section-header">// WAVE Cameras</div>
@@ -1372,6 +1469,32 @@
     </div>
   </div>
 
+  <!-- Site Modal -->
+  <div class="modal-overlay" id="site-modal">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title" id="site-modal-title">Create New Site</div>
+        <button class="modal-close" id="site-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="site-form">
+          <div class="form-group">
+            <label>Site Name *</label>
+            <input type="text" id="site-name-input" class="site-modal-input" placeholder="Main Office Campus" required />
+          </div>
+          <div class="form-group">
+            <label>Description (optional)</label>
+            <textarea id="site-description-input" class="site-modal-textarea" placeholder="Building A and B security cameras..."></textarea>
+          </div>
+          <div class="action-bar">
+            <button type="submit" class="btn" id="site-form-submit">Create Site</button>
+            <button type="button" class="btn btn-secondary" id="site-form-cancel">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ============================================================
     // CAMOPT AI - Frontend Application
@@ -1389,14 +1512,261 @@
 
     // ---- State Management ----
     const state = {
-      cameras: [],
-      optimizations: [],
-      healthSchedules: [],
+      // Site-based structure
+      sites: [],
+      currentSiteId: null,
+      // Transient state (not persisted)
       sampleFrameBase64: null,
       discoveredOnvif: [],
       discoveredWave: [],
       parsedCsv: []
     };
+
+    // ---- UUID Generator ----
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    // ---- Site Helper Functions ----
+    function getCurrentSite() {
+      if (!state.currentSiteId) return null;
+      return state.sites.find(s => s.id === state.currentSiteId) || null;
+    }
+
+    function getCurrentCameras() {
+      const site = getCurrentSite();
+      return site ? site.cameras : [];
+    }
+
+    function getCurrentOptimizations() {
+      const site = getCurrentSite();
+      return site ? site.optimizations : [];
+    }
+
+    function getCurrentHealthSchedules() {
+      const site = getCurrentSite();
+      return site ? site.healthSchedules : [];
+    }
+
+    function addCameraToCurrentSite(camera) {
+      const site = getCurrentSite();
+      if (!site) {
+        alert('Please create or select a site first');
+        return false;
+      }
+      // Check for duplicate
+      if (site.cameras.find(c => c.id === camera.id)) {
+        return false;
+      }
+      site.cameras.push(camera);
+      site.updatedAt = new Date().toISOString();
+      saveState();
+      return true;
+    }
+
+    function addOptimizationToCurrentSite(optimization) {
+      const site = getCurrentSite();
+      if (!site) return false;
+      site.optimizations.push(optimization);
+      site.updatedAt = new Date().toISOString();
+      saveState();
+      return true;
+    }
+
+    function removeCameraFromCurrentSite(idx) {
+      const site = getCurrentSite();
+      if (!site) return false;
+      site.cameras.splice(idx, 1);
+      site.updatedAt = new Date().toISOString();
+      saveState();
+      return true;
+    }
+
+    function updateHealthScheduleInCurrentSite(cameraId, scheduleData) {
+      const site = getCurrentSite();
+      if (!site) return false;
+      const existing = site.healthSchedules.findIndex(s => s.cameraId === cameraId);
+      if (existing >= 0) {
+        site.healthSchedules[existing] = { ...site.healthSchedules[existing], ...scheduleData };
+      } else {
+        site.healthSchedules.push(scheduleData);
+      }
+      site.updatedAt = new Date().toISOString();
+      saveState();
+      return true;
+    }
+
+    // ---- Site Management Functions ----
+    function createSite(name, description = '') {
+      const site = {
+        id: generateUUID(),
+        name: name.trim(),
+        description: description.trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        cameras: [],
+        optimizations: [],
+        healthSchedules: []
+      };
+      state.sites.push(site);
+      state.currentSiteId = site.id;
+      saveState();
+      updateUI();
+      return site;
+    }
+
+    function switchToSite(siteId) {
+      if (!siteId) {
+        state.currentSiteId = null;
+        saveState();
+        updateUI();
+        return;
+      }
+      if (!state.sites.find(s => s.id === siteId)) {
+        console.error('Site not found:', siteId);
+        return;
+      }
+      state.currentSiteId = siteId;
+      saveState();
+      updateUI();
+    }
+
+    function deleteSite(siteId) {
+      const idx = state.sites.findIndex(s => s.id === siteId);
+      if (idx === -1) return;
+
+      const site = state.sites[idx];
+      if (!confirm(`Delete site "${site.name}"?\n\nThis will remove ${site.cameras.length} cameras and ${site.optimizations.length} optimizations.`)) {
+        return;
+      }
+
+      state.sites.splice(idx, 1);
+
+      // If deleted current site, switch to another or null
+      if (state.currentSiteId === siteId) {
+        state.currentSiteId = state.sites.length > 0 ? state.sites[0].id : null;
+      }
+
+      saveState();
+      updateUI();
+      showToast('Site deleted');
+    }
+
+    function exportCurrentSite() {
+      const site = getCurrentSite();
+      if (!site) {
+        alert('No site selected to export');
+        return;
+      }
+
+      const exportData = {
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        site: site
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${site.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast(`Exported: ${site.name}`);
+    }
+
+    function importSiteFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+
+          // Validate format
+          if (!data.site || !data.site.id || !data.site.name) {
+            throw new Error('Invalid site file format');
+          }
+
+          // Check for version compatibility
+          if (data.version && data.version !== "1.0") {
+            console.warn('Site file version mismatch, attempting import anyway');
+          }
+
+          const importedSite = { ...data.site };
+
+          // Ensure required arrays exist
+          importedSite.cameras = importedSite.cameras || [];
+          importedSite.optimizations = importedSite.optimizations || [];
+          importedSite.healthSchedules = importedSite.healthSchedules || [];
+
+          // Check if site with same ID already exists
+          const existingIdx = state.sites.findIndex(s => s.id === importedSite.id);
+
+          if (existingIdx >= 0) {
+            if (confirm(`Site "${importedSite.name}" already exists. Replace it?`)) {
+              state.sites[existingIdx] = importedSite;
+            } else {
+              // Create as new site with new ID
+              importedSite.id = generateUUID();
+              importedSite.name = importedSite.name + ' (imported)';
+              importedSite.createdAt = new Date().toISOString();
+              importedSite.updatedAt = new Date().toISOString();
+              state.sites.push(importedSite);
+            }
+          } else {
+            state.sites.push(importedSite);
+          }
+
+          // Switch to imported site
+          state.currentSiteId = importedSite.id;
+          saveState();
+          updateUI();
+
+          showToast(`Imported site: ${importedSite.name} (${importedSite.cameras.length} cameras)`);
+
+        } catch (error) {
+          console.error('Import failed:', error);
+          alert('Failed to import site: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function showSiteModal(editMode = false) {
+      const modal = document.getElementById('site-modal');
+      const title = document.getElementById('site-modal-title');
+      const nameInput = document.getElementById('site-name-input');
+      const descInput = document.getElementById('site-description-input');
+      const submitBtn = document.getElementById('site-form-submit');
+
+      if (editMode && getCurrentSite()) {
+        const site = getCurrentSite();
+        title.textContent = 'Edit Site';
+        nameInput.value = site.name;
+        descInput.value = site.description || '';
+        submitBtn.textContent = 'Save Changes';
+        submitBtn.dataset.mode = 'edit';
+      } else {
+        title.textContent = 'Create New Site';
+        nameInput.value = '';
+        descInput.value = '';
+        submitBtn.textContent = 'Create Site';
+        submitBtn.dataset.mode = 'create';
+      }
+
+      modal.classList.add('active');
+      nameInput.focus();
+    }
+
+    function hideSiteModal() {
+      document.getElementById('site-modal').classList.remove('active');
+    }
 
     // Load state from localStorage
     function loadState() {
@@ -1404,9 +1774,34 @@
         const saved = localStorage.getItem('camopt_state');
         if (saved) {
           const parsed = JSON.parse(saved);
-          state.cameras = parsed.cameras || [];
-          state.optimizations = parsed.optimizations || [];
-          state.healthSchedules = parsed.healthSchedules || [];
+
+          // Migration: Check if this is old flat format
+          if (parsed.cameras && !parsed.sites) {
+            console.log('Migrating from legacy state format...');
+
+            const legacySite = {
+              id: generateUUID(),
+              name: 'Default Site',
+              description: 'Migrated from previous version',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              cameras: parsed.cameras || [],
+              optimizations: parsed.optimizations || [],
+              healthSchedules: parsed.healthSchedules || []
+            };
+
+            state.sites = [legacySite];
+            state.currentSiteId = legacySite.id;
+
+            // Save migrated state
+            saveState();
+            setTimeout(() => showToast('Data migrated to Sites format'), 500);
+
+          } else {
+            // New format
+            state.sites = parsed.sites || [];
+            state.currentSiteId = parsed.currentSiteId || (state.sites.length > 0 ? state.sites[0].id : null);
+          }
         }
       } catch (e) {
         console.error('Failed to load state:', e);
@@ -1418,27 +1813,37 @@
     function saveState() {
       try {
         localStorage.setItem('camopt_state', JSON.stringify({
-          cameras: state.cameras,
-          optimizations: state.optimizations,
-          healthSchedules: state.healthSchedules
+          sites: state.sites,
+          currentSiteId: state.currentSiteId
         }));
       } catch (e) {
         console.error('Failed to save state:', e);
       }
-      updateUI();
     }
 
     // ---- UI Updates ----
     function updateUI() {
+      const cameras = getCurrentCameras();
+      const optimizations = getCurrentOptimizations();
+      const healthSchedules = getCurrentHealthSchedules();
+
+      // Update site selector
+      updateSiteSelector();
+
+      // Update site-dependent button states
+      const hasSite = !!getCurrentSite();
+      document.getElementById('save-site-btn').disabled = !hasSite;
+      document.getElementById('delete-site-btn').disabled = !hasSite;
+
       // Header stats
-      document.getElementById('camera-count').textContent = state.cameras.length;
-      document.getElementById('optimized-count').textContent = state.optimizations.length;
-      document.getElementById('results-badge').textContent = state.optimizations.length;
+      document.getElementById('camera-count').textContent = cameras.length;
+      document.getElementById('optimized-count').textContent = optimizations.length;
+      document.getElementById('results-badge').textContent = optimizations.length;
 
       // Calculate overall health
-      const healthyCount = state.optimizations.filter(o => o.confidence >= 0.7).length;
-      const healthPct = state.optimizations.length > 0
-        ? Math.round((healthyCount / state.optimizations.length) * 100)
+      const healthyCount = optimizations.filter(o => o.confidence >= 0.7).length;
+      const healthPct = optimizations.length > 0
+        ? Math.round((healthyCount / optimizations.length) * 100)
         : '--';
       document.getElementById('health-status').textContent = healthPct === '--' ? '--' : healthPct + '%';
 
@@ -1455,16 +1860,42 @@
       updateHealthSection();
 
       // Update inventory count
-      document.getElementById('inventory-count').textContent = state.cameras.length;
+      document.getElementById('inventory-count').textContent = cameras.length;
+    }
+
+    function updateSiteSelector() {
+      const selector = document.getElementById('site-selector');
+      const currentValue = state.currentSiteId;
+
+      selector.innerHTML = '<option value="">-- No Site --</option>' +
+        state.sites.map(site => `
+          <option value="${site.id}"${site.id === currentValue ? ' selected' : ''}>${escapeHtml(site.name)} (${site.cameras.length})</option>
+        `).join('');
     }
 
     function updateInventoryTable() {
       const empty = document.getElementById('camera-inventory-empty');
       const table = document.getElementById('camera-inventory-table');
       const tbody = document.getElementById('inventory-table-body');
+      const cameras = getCurrentCameras();
+      const hasSite = !!getCurrentSite();
 
-      if (state.cameras.length === 0) {
+      if (!hasSite) {
         empty.style.display = 'block';
+        empty.innerHTML = `
+          <div class="empty-state-icon">+</div>
+          <div class="empty-state-text">Create or load a site to get started</div>
+        `;
+        table.style.display = 'none';
+        return;
+      }
+
+      if (cameras.length === 0) {
+        empty.style.display = 'block';
+        empty.innerHTML = `
+          <div class="empty-state-icon">+</div>
+          <div class="empty-state-text">No cameras imported yet</div>
+        `;
         table.style.display = 'none';
         return;
       }
@@ -1472,7 +1903,7 @@
       empty.style.display = 'none';
       table.style.display = 'table';
 
-      tbody.innerHTML = state.cameras.map((cam, idx) => `
+      tbody.innerHTML = cameras.map((cam, idx) => `
         <tr>
           <td>${escapeHtml(cam.id)}</td>
           <td>${escapeHtml(cam.ip)}</td>
@@ -1488,14 +1919,26 @@
     function updateCameraSelector() {
       const select = document.getElementById('optimize-camera-select');
       const currentValue = select.value;
+      const cameras = getCurrentCameras();
+      const hasSite = !!getCurrentSite();
+
+      if (!hasSite) {
+        select.innerHTML = '<option value="">-- Create a site first --</option>';
+        return;
+      }
+
+      if (cameras.length === 0) {
+        select.innerHTML = '<option value="">-- No cameras in site --</option>';
+        return;
+      }
 
       select.innerHTML = '<option value="">-- Select Camera --</option>' +
-        state.cameras.map(cam => `
+        cameras.map(cam => `
           <option value="${escapeHtml(cam.id)}">${escapeHtml(cam.id)} (${escapeHtml(cam.ip)})</option>
         `).join('');
 
       // Restore selection if still valid
-      if (currentValue && state.cameras.find(c => c.id === currentValue)) {
+      if (currentValue && cameras.find(c => c.id === currentValue)) {
         select.value = currentValue;
       }
     }
@@ -1503,10 +1946,28 @@
     function updateResultsGrid() {
       const empty = document.getElementById('results-empty');
       const grid = document.getElementById('results-grid');
-      document.getElementById('total-optimizations').textContent = state.optimizations.length;
+      const optimizations = getCurrentOptimizations();
+      const cameras = getCurrentCameras();
+      const hasSite = !!getCurrentSite();
 
-      if (state.optimizations.length === 0) {
+      document.getElementById('total-optimizations').textContent = optimizations.length;
+
+      if (!hasSite) {
         empty.style.display = 'block';
+        empty.innerHTML = `
+          <div class="empty-state-icon">#</div>
+          <div class="empty-state-text">Create or load a site to view results</div>
+        `;
+        grid.style.display = 'none';
+        return;
+      }
+
+      if (optimizations.length === 0) {
+        empty.style.display = 'block';
+        empty.innerHTML = `
+          <div class="empty-state-icon">#</div>
+          <div class="empty-state-text">No optimization results yet</div>
+        `;
         grid.style.display = 'none';
         return;
       }
@@ -1516,14 +1977,14 @@
 
       // Group by camera, show latest
       const latestByCam = {};
-      state.optimizations.forEach(opt => {
+      optimizations.forEach(opt => {
         if (!latestByCam[opt.cameraId] || new Date(opt.timestamp) > new Date(latestByCam[opt.cameraId].timestamp)) {
           latestByCam[opt.cameraId] = opt;
         }
       });
 
       grid.innerHTML = Object.values(latestByCam).map((opt, idx) => {
-        const cam = state.cameras.find(c => c.id === opt.cameraId) || {};
+        const cam = cameras.find(c => c.id === opt.cameraId) || {};
         const confPct = Math.round(opt.confidence * 100);
         const confClass = confPct >= 80 ? 'confidence-high' : confPct >= 60 ? 'confidence-medium' : 'confidence-low';
         const statusClass = confPct >= 70 ? '' : confPct >= 50 ? 'warning' : 'error';
@@ -1562,12 +2023,18 @@
     }
 
     function updateHealthSection() {
+      const cameras = getCurrentCameras();
+      const healthSchedules = getCurrentHealthSchedules();
+      const hasSite = !!getCurrentSite();
+
       // Update camera checkboxes
       const list = document.getElementById('health-camera-list');
-      if (state.cameras.length === 0) {
+      if (!hasSite) {
+        list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem;">Create or load a site first</div>';
+      } else if (cameras.length === 0) {
         list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem;">No cameras imported</div>';
       } else {
-        list.innerHTML = state.cameras.map(cam => `
+        list.innerHTML = cameras.map(cam => `
           <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
             <input type="checkbox" class="health-camera-checkbox" value="${escapeHtml(cam.id)}" />
             <span>${escapeHtml(cam.id)} - ${escapeHtml(cam.location || cam.ip)}</span>
@@ -1579,8 +2046,12 @@
       const empty = document.getElementById('health-status-empty');
       const grid = document.getElementById('health-status-grid');
 
-      if (state.healthSchedules.length === 0) {
+      if (!hasSite || healthSchedules.length === 0) {
         empty.style.display = 'block';
+        empty.innerHTML = `
+          <div class="empty-state-icon">~</div>
+          <div class="empty-state-text">${!hasSite ? 'Create or load a site first' : 'No health data yet'}</div>
+        `;
         grid.style.display = 'none';
         return;
       }
@@ -1588,7 +2059,7 @@
       empty.style.display = 'none';
       grid.style.display = 'grid';
 
-      grid.innerHTML = state.healthSchedules.map(schedule => {
+      grid.innerHTML = healthSchedules.map(schedule => {
         const lastHealth = schedule.lastHealth || {};
         const confPct = lastHealth.confidence ? Math.round(lastHealth.confidence * 100) : '--';
         const confClass = confPct >= 80 ? 'confidence-high' : confPct >= 60 ? 'confidence-medium' : 'confidence-low';
@@ -1673,13 +2144,17 @@
         return;
       }
 
-      if (state.cameras.find(c => c.id === camera.id)) {
-        alert('Camera with this ID already exists');
+      if (!getCurrentSite()) {
+        alert('Please create or select a site first');
         return;
       }
 
-      state.cameras.push(camera);
-      saveState();
+      if (getCurrentCameras().find(c => c.id === camera.id)) {
+        alert('Camera with this ID already exists in this site');
+        return;
+      }
+
+      addCameraToCurrentSite(camera);
 
       // Clear form
       e.target.reset();
@@ -1697,12 +2172,21 @@
 
       try {
         const response = await fetch(`${API_BASE}/api/discover?timeout=${timeout}&max_cameras=${maxCameras}`);
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+
         const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
 
         state.discoveredOnvif = data.cameras || [];
 
         if (state.discoveredOnvif.length === 0) {
-          alert('No cameras found on network');
+          alert('No cameras found on network. Make sure:\n- ONVIF cameras are on the same subnet\n- WS-Discovery is not blocked by firewall\n- Cameras have ONVIF enabled');
           document.getElementById('onvif-results').style.display = 'none';
           return;
         }
@@ -1723,7 +2207,11 @@
 
       } catch (error) {
         console.error('ONVIF discovery error:', error);
-        alert('Discovery failed: ' + error.message);
+        if (error.message === 'Failed to fetch') {
+          alert('Cannot connect to backend server.\n\nMake sure the backend is running:\n  cd backend\n  start.bat\n\nBackend should be at: ' + API_BASE);
+        } else {
+          alert('Discovery failed: ' + error.message);
+        }
       } finally {
         btn.disabled = false;
         btn.textContent = 'Scan Network';
@@ -1746,10 +2234,16 @@
         return;
       }
 
+      if (!getCurrentSite()) {
+        alert('Please create or select a site first');
+        return;
+      }
+
+      let imported = 0;
       selected.forEach(cam => {
         const id = 'CAM-' + (cam.ip || '').replace(/\./g, '-');
-        if (!state.cameras.find(c => c.id === id)) {
-          state.cameras.push({
+        if (!getCurrentCameras().find(c => c.id === id)) {
+          const camera = {
             id: id,
             ip: cam.ip || cam.address || '',
             location: '',
@@ -1757,17 +2251,19 @@
             model: cam.model || '',
             source: 'onvif',
             importedAt: new Date().toISOString()
-          });
+          };
+          if (addCameraToCurrentSite(camera)) {
+            imported++;
+          }
         }
       });
-
-      saveState();
-      showToast(`Imported ${selected.length} cameras`);
+      showToast(`Imported ${imported} cameras`);
       document.getElementById('onvif-results').style.display = 'none';
     });
 
     // ---- Camera Import: WAVE ----
-    document.getElementById('wave-connect-btn').addEventListener('click', async () => {
+    document.getElementById('wave-connect-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
       const btn = document.getElementById('wave-connect-btn');
       const serverIp = document.getElementById('wave-server-ip').value.trim();
       const port = document.getElementById('wave-port').value;
@@ -1816,7 +2312,11 @@
 
       } catch (error) {
         console.error('WAVE discovery error:', error);
-        alert('Connection failed: ' + error.message);
+        if (error.message === 'Failed to fetch') {
+          alert('Cannot connect to backend server.\n\nMake sure the backend is running:\n  cd backend\n  start.bat\n\nBackend should be at: ' + API_BASE);
+        } else {
+          alert('Connection failed: ' + error.message);
+        }
       } finally {
         btn.disabled = false;
         btn.textContent = 'Connect to WAVE';
@@ -1839,10 +2339,16 @@
         return;
       }
 
+      if (!getCurrentSite()) {
+        alert('Please create or select a site first');
+        return;
+      }
+
+      let imported = 0;
       selected.forEach(cam => {
         const id = cam.id || 'CAM-WAVE-' + Date.now();
-        if (!state.cameras.find(c => c.id === id)) {
-          state.cameras.push({
+        if (!getCurrentCameras().find(c => c.id === id)) {
+          const camera = {
             id: id,
             ip: cam.ip || '',
             location: cam.name || '',
@@ -1852,12 +2358,14 @@
             vmsCameraId: cam.id,
             source: 'wave',
             importedAt: new Date().toISOString()
-          });
+          };
+          if (addCameraToCurrentSite(camera)) {
+            imported++;
+          }
         }
       });
 
-      saveState();
-      showToast(`Imported ${selected.length} cameras`);
+      showToast(`Imported ${imported} cameras`);
       document.getElementById('wave-results').style.display = 'none';
     });
 
@@ -1944,19 +2452,25 @@
         return;
       }
 
+      if (!getCurrentSite()) {
+        alert('Please create or select a site first');
+        return;
+      }
+
       let imported = 0;
       state.parsedCsv.forEach(cam => {
-        if (!state.cameras.find(c => c.id === cam.id)) {
-          state.cameras.push({
+        if (!getCurrentCameras().find(c => c.id === cam.id)) {
+          const camera = {
             ...cam,
             source: 'csv',
             importedAt: new Date().toISOString()
-          });
-          imported++;
+          };
+          if (addCameraToCurrentSite(camera)) {
+            imported++;
+          }
         }
       });
 
-      saveState();
       showToast(`Imported ${imported} cameras`);
 
       // Clear
@@ -1980,8 +2494,8 @@
     // ---- Remove Camera ----
     function removeCamera(idx) {
       if (confirm('Remove this camera from inventory?')) {
-        state.cameras.splice(idx, 1);
-        saveState();
+        removeCameraFromCurrentSite(idx);
+        updateUI();
       }
     }
 
@@ -2040,7 +2554,7 @@
         return;
       }
 
-      const camera = state.cameras.find(c => c.id === cameraId);
+      const camera = getCurrentCameras().find(c => c.id === cameraId);
       if (!camera) {
         alert('Camera not found');
         return;
@@ -2095,7 +2609,7 @@
         const result = await response.json();
 
         // Store optimization result
-        state.optimizations.push({
+        addOptimizationToCurrentSite({
           cameraId: camera.id,
           timestamp: result.generatedAt || new Date().toISOString(),
           confidence: result.confidence,
@@ -2104,7 +2618,7 @@
           explanation: result.explanation,
           warnings: result.warnings || []
         });
-        saveState();
+        updateUI();
 
         // Display result
         displayOptimizationResult(result);
@@ -2135,12 +2649,12 @@
 
     // ---- Results Detail Modal ----
     function showOptimizationDetail(cameraId) {
-      const opt = state.optimizations.filter(o => o.cameraId === cameraId)
+      const opt = getCurrentOptimizations().filter(o => o.cameraId === cameraId)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
 
       if (!opt) return;
 
-      const cam = state.cameras.find(c => c.id === cameraId) || {};
+      const cam = getCurrentCameras().find(c => c.id === cameraId) || {};
       const modal = document.getElementById('detail-modal');
       const title = document.getElementById('modal-title');
       const body = document.getElementById('modal-body');
@@ -2212,8 +2726,8 @@
     });
 
     async function applySettings(cameraId) {
-      const cam = state.cameras.find(c => c.id === cameraId);
-      const opt = state.optimizations.filter(o => o.cameraId === cameraId)
+      const cam = getCurrentCameras().find(c => c.id === cameraId);
+      const opt = getCurrentOptimizations().filter(o => o.cameraId === cameraId)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
 
       if (!cam || !opt) {
@@ -2270,6 +2784,11 @@
     document.getElementById('health-schedule-form').addEventListener('submit', (e) => {
       e.preventDefault();
 
+      if (!getCurrentSite()) {
+        alert('Please create or select a site first');
+        return;
+      }
+
       const selectedCameras = [];
       document.querySelectorAll('.health-camera-checkbox:checked').forEach(cb => {
         selectedCameras.push(cb.value);
@@ -2286,8 +2805,6 @@
 
       // Create/update schedules
       selectedCameras.forEach(cameraId => {
-        const existing = state.healthSchedules.findIndex(s => s.cameraId === cameraId);
-
         const schedule = {
           cameraId,
           interval,
@@ -2299,14 +2816,10 @@
           lastHealth: null
         };
 
-        if (existing >= 0) {
-          state.healthSchedules[existing] = { ...state.healthSchedules[existing], ...schedule };
-        } else {
-          state.healthSchedules.push(schedule);
-        }
+        updateHealthScheduleInCurrentSite(cameraId, schedule);
       });
 
-      saveState();
+      updateUI();
       showToast('Health schedule saved');
     });
 
@@ -2326,6 +2839,11 @@
     }
 
     document.getElementById('health-check-now-btn').addEventListener('click', async () => {
+      if (!getCurrentSite()) {
+        alert('Please create or select a site first');
+        return;
+      }
+
       const selectedCameras = [];
       document.querySelectorAll('.health-camera-checkbox:checked').forEach(cb => {
         selectedCameras.push(cb.value);
@@ -2339,12 +2857,12 @@
       showToast('Running health check...');
 
       for (const cameraId of selectedCameras) {
-        const cam = state.cameras.find(c => c.id === cameraId);
+        const cam = getCurrentCameras().find(c => c.id === cameraId);
         if (!cam) continue;
 
         try {
           // Get last optimization for comparison
-          const lastOpt = state.optimizations.filter(o => o.cameraId === cameraId)
+          const lastOpt = getCurrentOptimizations().filter(o => o.cameraId === cameraId)
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
 
           // Run a quick optimization check
@@ -2362,35 +2880,29 @@
           const result = await response.json();
 
           // Update health schedule
-          const scheduleIdx = state.healthSchedules.findIndex(s => s.cameraId === cameraId);
           const healthData = {
             confidence: result.confidence,
             driftDetected: lastOpt ? Math.abs(result.confidence - lastOpt.confidence) > 0.15 : false,
             checkedAt: new Date().toISOString()
           };
 
-          if (scheduleIdx >= 0) {
-            state.healthSchedules[scheduleIdx].lastCheck = new Date().toISOString();
-            state.healthSchedules[scheduleIdx].lastHealth = healthData;
-          } else {
-            state.healthSchedules.push({
-              cameraId,
-              interval: 'daily',
-              timeOfDay: '02:00',
-              threshold: 70,
-              enabled: false,
-              lastCheck: new Date().toISOString(),
-              nextCheck: null,
-              lastHealth: healthData
-            });
-          }
+          updateHealthScheduleInCurrentSite(cameraId, {
+            cameraId,
+            interval: 'daily',
+            timeOfDay: '02:00',
+            threshold: 70,
+            enabled: false,
+            lastCheck: new Date().toISOString(),
+            nextCheck: null,
+            lastHealth: healthData
+          });
 
         } catch (error) {
           console.error('Health check failed for', cameraId, error);
         }
       }
 
-      saveState();
+      updateUI();
       showToast('Health check complete');
     });
 
@@ -2426,6 +2938,73 @@
         setTimeout(() => toast.remove(), 300);
       }, 3000);
     }
+
+    // ---- Site Event Listeners ----
+    document.getElementById('site-selector').addEventListener('change', (e) => {
+      switchToSite(e.target.value || null);
+    });
+
+    document.getElementById('new-site-btn').addEventListener('click', () => {
+      showSiteModal(false);
+    });
+
+    document.getElementById('save-site-btn').addEventListener('click', () => {
+      exportCurrentSite();
+    });
+
+    document.getElementById('load-site-btn').addEventListener('click', () => {
+      document.getElementById('site-import-input').click();
+    });
+
+    document.getElementById('site-import-input').addEventListener('change', (e) => {
+      if (e.target.files[0]) {
+        importSiteFromFile(e.target.files[0]);
+        e.target.value = ''; // Reset input
+      }
+    });
+
+    document.getElementById('delete-site-btn').addEventListener('click', () => {
+      if (state.currentSiteId) {
+        deleteSite(state.currentSiteId);
+      }
+    });
+
+    // Site modal event listeners
+    document.getElementById('site-modal-close').addEventListener('click', hideSiteModal);
+    document.getElementById('site-form-cancel').addEventListener('click', hideSiteModal);
+
+    document.getElementById('site-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'site-modal') {
+        hideSiteModal();
+      }
+    });
+
+    document.getElementById('site-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('site-name-input').value.trim();
+      const description = document.getElementById('site-description-input').value.trim();
+      const mode = document.getElementById('site-form-submit').dataset.mode;
+
+      if (!name) {
+        alert('Site name is required');
+        return;
+      }
+
+      if (mode === 'edit' && getCurrentSite()) {
+        const site = getCurrentSite();
+        site.name = name;
+        site.description = description;
+        site.updatedAt = new Date().toISOString();
+        saveState();
+        updateUI();
+        showToast('Site updated');
+      } else {
+        createSite(name, description);
+        showToast('Site created: ' + name);
+      }
+
+      hideSiteModal();
+    });
 
     // ---- Initialize ----
     loadState();

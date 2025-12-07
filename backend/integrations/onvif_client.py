@@ -16,6 +16,8 @@ from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+logger = logging.getLogger(__name__)
+
 from onvif import ONVIFCamera
 from zeep.exceptions import Fault as ZeepFault
 
@@ -28,8 +30,6 @@ except ImportError:
     WSDISCOVERY_AVAILABLE = False
     WSDiscovery = None
     Scope = None
-
-logger = logging.getLogger(__name__)
 
 
 class ONVIFClient:

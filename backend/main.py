@@ -130,6 +130,18 @@ class OptimizeResponse(BaseModel):
     processingTime: float  # seconds
     generatedAt: str  # ISO 8601 timestamp
 
+# ---- Health check endpoint ----
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint to verify backend is running"""
+    return {
+        "status": "ok",
+        "version": "0.2.0-alpha",
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+    }
+
+
 # ---- Discovery endpoints ----
 
 @app.get("/api/discover")

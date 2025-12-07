@@ -26,15 +26,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Backend (`backend/`)
 - **Framework**: FastAPI (Python 3.10+)
-- **AI**: Anthropic Claude Sonnet 4.5 Vision
+- **AI**: Anthropic Claude Vision (`claude-sonnet-4-5-20250929`)
 - **Camera Integration**: ONVIF protocol, Hanwha WAVE VMS API
 
 Key backend files:
-- `main.py` - FastAPI app, all API endpoints
+- `main.py` - FastAPI app, all API endpoints, Pydantic models
 - `config.py` - Pydantic settings from `.env`
 - `services/optimization.py` - Claude AI integration + heuristic fallback
 - `services/discovery.py` - ONVIF and WAVE camera discovery
 - `services/apply.py` - Apply settings via ONVIF/VMS
+- `integrations/claude_client.py` - Anthropic Claude API wrapper
+- `integrations/onvif_client.py` - ONVIF camera protocol client
+- `integrations/hanwha_wave_client.py` - Hanwha WAVE VMS API client
 
 ## Development Commands
 
@@ -78,11 +81,16 @@ Backend: See `backend/README.md` for Render/Railway deployment
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/api/health` | GET | Health check |
 | `/api/optimize` | POST | Generate optimal settings (AI + fallback) |
-| `/api/discover` | GET | ONVIF camera discovery |
-| `/api/cameras/{id}/capabilities` | GET | Query camera capabilities |
+| `/api/discover` | GET | ONVIF camera discovery (WS-Discovery) |
+| `/api/cameras/{id}/capabilities` | GET | Query camera capabilities via ONVIF |
+| `/api/cameras/{id}/current-settings` | GET | Query current settings via ONVIF |
 | `/api/apply` | POST | Apply settings via ONVIF/VMS |
-| `/api/wave/discover` | GET | Hanwha WAVE VMS discovery |
+| `/api/apply/status/{job_id}` | GET | Check apply job status |
+| `/api/wave/discover` | GET | Hanwha WAVE VMS camera discovery |
+| `/api/wave/cameras/{id}/capabilities` | GET | Query capabilities via WAVE |
+| `/api/wave/cameras/{id}/current-settings` | GET | Query current settings via WAVE |
 
 API docs: `http://localhost:8000/docs` (Swagger UI)
 
@@ -100,24 +108,28 @@ API docs: `http://localhost:8000/docs` (Swagger UI)
 Edit the prompt template in `services/optimization.py` (`_build_optimization_prompt` method)
 
 ### Adding VMS Integration
-1. Add client in `services/discovery.py` for camera discovery
-2. Add adapter in `services/apply.py` for settings application
-3. Add endpoints in `main.py`
+1. Add client in `integrations/` (e.g., `integrations/new_vms_client.py`)
+2. Add discovery methods in `services/discovery.py`
+3. Add apply adapter in `services/apply.py`
+4. Add endpoints in `main.py`
 
 ## Environment Variables
 
 Required in `backend/.env`:
 ```
-ANTHROPIC_API_KEY=sk-ant-...  # Required for AI
+ANTHROPIC_API_KEY=sk-ant-...  # Required for AI optimization
 ```
 
-Optional:
+Optional (with defaults):
 ```
 APP_ENV=development
 CLAUDE_MODEL=claude-sonnet-4-5-20250929
-FALLBACK_TO_HEURISTIC=true
+FALLBACK_TO_HEURISTIC=true         # Fall back to heuristic if AI fails
 DATABASE_URL=sqlite:///./camopt.db
-CORS_ORIGINS=http://localhost:3000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,file://
+ONVIF_TIMEOUT_SECONDS=10
+AI_OPTIMIZATION_TIMEOUT_SECONDS=30
+LOG_LEVEL=INFO
 ```
 
 ## Domain Context
