@@ -19,7 +19,8 @@ DATE:           2025-CURRENT
 STATUS:         TESTING PHASE - CLAUDE VISION AI ACTIVE
 ```
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Commercial License](https://img.shields.io/badge/License-Commercial-orange.svg)](COMMERCIAL.md)
 
 ## MISSION STATEMENT
 
@@ -306,16 +307,19 @@ CamOpt AI is the first step toward **universal camera optimization** - where eve
 
 ## LICENSE
 
-This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
+CamOpt AI is dual-licensed:
+
+**Open Source:** AGPL v3 (see [LICENSE](LICENSE))
+
+**Commercial:** Available upon request for integrators, OEMs, VARs, and SaaS deployments (see [COMMERCIAL.md](COMMERCIAL.md))
 
 ```
 Copyright 2025 CamOpt AI Contributors
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 ```
 
 ## CONTACT
