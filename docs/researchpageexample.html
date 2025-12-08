@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surveillance Image Optimization & Technology Report</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+        .chart-container { 
+            position: relative; 
+            width: 100%; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            height: 300px; 
+        }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        .nav-active { border-bottom: 2px solid #0f172a; color: #0f172a; font-weight: 600; }
+        .tab-active { background-color: #e2e8f0; color: #0f172a; border-left: 4px solid #3b82f6; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+    </style>
+    <!-- Chosen Palette: Slate/Blue (Professional, Tech-focused) -->
+    <!-- Application Structure Plan: 
+         1. Header: Report Context.
+         2. Scenario Simulator (The Core): Users select a real-world environment (e.g., Night Parking, Lobby). The app dynamically updates a "Virtual Camera Configuration" panel and a "Histogram" chart to show how light data changes.
+         3. Technology Deep Dive: Interactive cards explaining acronyms (WDR, BLC) with comparative data visuals.
+         4. Manufacturer Mapping: A functional tool to translate generic terms to brand-specific menu items (Axis vs Hikvision vs Dahua).
+         5. Calculator: Bandwidth/Storage estimator based on compression technologies discussed.
+    -->
+    <!-- Visualization & Content Choices:
+         - Histogram Chart (Chart.js): Visualizes exposure levels (Underexposed/Overexposed) to explain WDR logic.
+         - Scatter Plot (Chart.js): Visualizes the trade-off between Shutter Speed (Blur) and Gain (Noise).
+         - Interactive Tables/Lists: For manufacturer comparisons and glossary.
+         - Logic: JS filters scenarios and updates DOM elements.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-xl font-bold text-slate-800">CamOptimizr <span class="text-xs font-normal text-slate-500 ml-2">Surveillance Tech Report</span></span>
+                </div>
+                <div class="hidden sm:flex sm:space-x-8">
+                    <button onclick="navigate('dashboard')" id="nav-dashboard" class="nav-active inline-flex items-center px-1 pt-1 text-sm font-medium text-slate-900 h-full transition-colors duration-200">Scenario Simulator</button>
+                    <button onclick="navigate('tech')" id="nav-tech" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-slate-500 hover:text-slate-700 h-full transition-colors duration-200">Tech Deep Dive</button>
+                    <button onclick="navigate('manufacturers')" id="nav-manufacturers" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-slate-500 hover:text-slate-700 h-full transition-colors duration-200">Manufacturer Guide</button>
+                    <button onclick="navigate('calculator')" id="nav-calculator" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-slate-500 hover:text-slate-700 h-full transition-colors duration-200">Storage Calculator</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- SECTION 1: SCENARIO SIMULATOR (DASHBOARD) -->
+        <section id="view-dashboard" class="space-y-8 animate-fade-in">
+            <div class="text-center max-w-3xl mx-auto mb-10">
+                <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Image Optimization Simulator</h1>
+                <p class="mt-4 text-lg text-slate-600">
+                    Surveillance cameras require specific configurations based on environmental conditions. 
+                    This interactive module demonstrates how adjusting **Exposure**, **Gain**, and **WDR** settings 
+                    impacts image quality across critical security scenarios. Select a scenario below to see the ideal configuration.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Scenario Selector -->
+                <div class="lg:col-span-3 space-y-2">
+                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Select Environment</h3>
+                    <button onclick="loadScenario('lobby')" id="btn-lobby" class="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 shadow-sm transition-all tab-active group">
+                        <div class="font-medium">High Contrast Lobby</div>
+                        <div class="text-xs text-slate-500 mt-1">Backlight challenges</div>
+                    </button>
+                    <button onclick="loadScenario('lpr')" id="btn-lpr" class="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 shadow-sm transition-all group">
+                        <div class="font-medium">License Plate (LPR)</div>
+                        <div class="text-xs text-slate-500 mt-1">Fast motion, headlight glare</div>
+                    </button>
+                    <button onclick="loadScenario('perimeter')" id="btn-perimeter" class="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 shadow-sm transition-all group">
+                        <div class="font-medium">Dark Perimeter</div>
+                        <div class="text-xs text-slate-500 mt-1">Low light, long range</div>
+                    </button>
+                    <button onclick="loadScenario('retail')" id="btn-retail" class="w-full text-left px-4 py-3 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 shadow-sm transition-all group">
+                        <div class="font-medium">Retail Point of Sale</div>
+                        <div class="text-xs text-slate-500 mt-1">Detail & color priority</div>
+                    </button>
+                </div>
+
+                <!-- Virtual Camera Config -->
+                <div class="lg:col-span-5 bg-white rounded-xl border border-slate-200 card-shadow p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                            <span class="text-2xl mr-2">⚙️</span> Recommended Configuration
+                        </h2>
+                        <span id="scenario-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Lobby Mode</span>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Setting: Shutter -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm font-medium text-slate-700">Shutter Speed (Exposure)</span>
+                                <span id="val-shutter" class="text-sm font-bold text-blue-600">1/30s</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2">
+                                <div id="bar-shutter" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 20%"></div>
+                            </div>
+                            <p id="desc-shutter" class="text-xs text-slate-500 mt-1">Standard speed to capture natural light.</p>
+                        </div>
+
+                        <!-- Setting: Gain -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm font-medium text-slate-700">Gain (ISO/Sensitivity)</span>
+                                <span id="val-gain" class="text-sm font-bold text-blue-600">Low (10-20)</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2">
+                                <div id="bar-gain" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 15%"></div>
+                            </div>
+                            <p id="desc-gain" class="text-xs text-slate-500 mt-1">Keep low to reduce image noise.</p>
+                        </div>
+
+                        <!-- Setting: WDR -->
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-slate-700">WDR (Wide Dynamic Range)</span>
+                                <span id="val-wdr" class="text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded">ON (120dB)</span>
+                            </div>
+                            <p id="desc-wdr" class="text-xs text-slate-500 mt-1">Essential for balancing bright windows and dark interiors.</p>
+                        </div>
+                        
+                         <!-- Setting: Special -->
+                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-slate-700">Special Feature</span>
+                                <span id="val-special" class="text-xs font-bold px-2 py-1 bg-purple-100 text-purple-700 rounded">HLC: OFF</span>
+                            </div>
+                            <p id="desc-special" class="text-xs text-slate-500 mt-1">High Light Compensation not needed here.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualization Column -->
+                <div class="lg:col-span-4 flex flex-col space-y-6">
+                    <!-- Histogram Chart -->
+                    <div class="bg-white rounded-xl border border-slate-200 card-shadow p-4 flex flex-col">
+                        <h3 class="text-sm font-semibold text-slate-700 mb-2">Simulated Light Histogram</h3>
+                        <div class="chart-container">
+                            <canvas id="histogramChart"></canvas>
+                        </div>
+                        <p class="text-xs text-slate-400 text-center mt-2">
+                            X-Axis: Brightness (0-255) | Y-Axis: Pixel Count
+                        </p>
+                    </div>
+                    
+                    <!-- Insight Box -->
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                        <h4 class="text-sm font-bold text-blue-800 mb-1">Why this configuration?</h4>
+                        <p id="scenario-insight" class="text-sm text-blue-700 leading-relaxed">
+                            In a lobby, the camera faces bright outdoor light while monitoring a darker interior. WDR combines short and long exposures to ensure both the person entering and the background details are visible.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: TECH DEEP DIVE -->
+        <section id="view-tech" class="hidden space-y-8 animate-fade-in">
+            <div class="mb-8 border-b border-slate-200 pb-4">
+                <h2 class="text-2xl font-bold text-slate-900">Core Technologies Explained</h2>
+                <p class="text-slate-600 mt-2">A technical breakdown of the algorithms used to process surveillance imagery. Click cards to view comparative data.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <!-- Tech Cards -->
+                <div onclick="updateTechDetail('wdr')" class="cursor-pointer bg-white p-5 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all group">
+                    <h3 class="text-lg font-bold text-slate-800 group-hover:text-blue-600">WDR</h3>
+                    <p class="text-xs text-slate-400 uppercase font-semibold mt-1">Wide Dynamic Range</p>
+                    <p class="text-sm text-slate-600 mt-3">Combines multiple exposures to balance extreme light/dark.</p>
+                </div>
+                <div onclick="updateTechDetail('hlc')" class="cursor-pointer bg-white p-5 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all group">
+                    <h3 class="text-lg font-bold text-slate-800 group-hover:text-blue-600">HLC</h3>
+                    <p class="text-xs text-slate-400 uppercase font-semibold mt-1">High Light Compensation</p>
+                    <p class="text-sm text-slate-600 mt-3">Masks bright spots (headlights) to prevent blinding.</p>
+                </div>
+                <div onclick="updateTechDetail('dnr')" class="cursor-pointer bg-white p-5 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all group">
+                    <h3 class="text-lg font-bold text-slate-800 group-hover:text-blue-600">3D DNR</h3>
+                    <p class="text-xs text-slate-400 uppercase font-semibold mt-1">Digital Noise Reduction</p>
+                    <p class="text-sm text-slate-600 mt-3">Compares frames temporally to remove static grain.</p>
+                </div>
+                <div onclick="updateTechDetail('roi')" class="cursor-pointer bg-white p-5 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all group">
+                    <h3 class="text-lg font-bold text-slate-800 group-hover:text-blue-600">Smart Codec</h3>
+                    <p class="text-xs text-slate-400 uppercase font-semibold mt-1">H.265+ / Zipstream</p>
+                    <p class="text-sm text-slate-600 mt-3">Dynamic compression based on movement in ROI.</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200 card-shadow p-6 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div>
+                    <h3 id="tech-title" class="text-2xl font-bold text-slate-800 mb-2">Wide Dynamic Range (WDR)</h3>
+                    <div class="h-1 w-20 bg-blue-500 rounded mb-4"></div>
+                    <p id="tech-desc" class="text-slate-600 mb-6 leading-relaxed">
+                        Standard cameras struggle when a scene has both very bright and very dark areas (e.g., looking out a door). The sensor either exposes for the bright outside (making the inside pitch black) or the dark inside (blowing out the outside). WDR takes 2-3 frames at different shutter speeds and merges them.
+                    </p>
+                    <ul id="tech-list" class="space-y-2 text-sm text-slate-700">
+                        <li class="flex items-center">✅ <b>dB Rating:</b> Higher is better (120dB is standard True WDR).</li>
+                        <li class="flex items-center">✅ <b>Artifacts:</b> Fast motion can cause "ghosting" in WDR mode.</li>
+                        <li class="flex items-center">✅ <b>Use Case:</b> Entrances, ATMs, window-facing desks.</li>
+                    </ul>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    <h4 class="text-sm font-semibold text-slate-500 mb-4 text-center">Performance Impact Visualizer</h4>
+                    <div class="chart-container">
+                        <canvas id="techChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: MANUFACTURER MAPPING -->
+        <section id="view-manufacturers" class="hidden space-y-8 animate-fade-in">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-slate-900">Manufacturer Setting Guide</h2>
+                <p class="text-slate-600 mt-2">Different brands use proprietary terms for standard technologies. Use this matrix to find the right setting in your camera's web interface.</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Technology</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider text-red-600">Hikvision</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider text-orange-600">Axis Communications</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider text-blue-600">Dahua</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider text-black">Hanwha Vision</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-slate-200 text-sm text-slate-700">
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-bold">Smart Compression</td>
+                                <td class="px-6 py-4">H.265+</td>
+                                <td class="px-6 py-4">Zipstream</td>
+                                <td class="px-6 py-4">Smart H.265+</td>
+                                <td class="px-6 py-4">WiseStream II/III</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-bold">Low Light Color</td>
+                                <td class="px-6 py-4">DarkFighter / ColorVu</td>
+                                <td class="px-6 py-4">Lightfinder</td>
+                                <td class="px-6 py-4">Starlight / Full-color</td>
+                                <td class="px-6 py-4">extraLUX</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-bold">Highlight Masking</td>
+                                <td class="px-6 py-4">HLC</td>
+                                <td class="px-6 py-4">Exposure Priority</td>
+                                <td class="px-6 py-4">HLC</td>
+                                <td class="px-6 py-4">HLC</td>
+                            </tr>
+                             <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-bold">Wide Dynamic Range</td>
+                                <td class="px-6 py-4">120dB WDR</td>
+                                <td class="px-6 py-4">Forensic WDR</td>
+                                <td class="px-6 py-4">True WDR</td>
+                                <td class="px-6 py-4">WDR (150dB)</td>
+                            </tr>
+                             <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-bold">Fog/Haze Removal</td>
+                                <td class="px-6 py-4">Defog</td>
+                                <td class="px-6 py-4">Electronic Image Stab.</td>
+                                <td class="px-6 py-4">Defog</td>
+                                <td class="px-6 py-4">Defog</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="bg-slate-50 px-6 py-3 text-xs text-slate-500">
+                    * Menu paths may vary by firmware version. Always check the "Image" or "Video/Audio" subsystems.
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: STORAGE CALCULATOR -->
+        <section id="view-calculator" class="hidden space-y-8 animate-fade-in">
+            <div class="text-center max-w-2xl mx-auto mb-8">
+                <h2 class="text-2xl font-bold text-slate-900">Bitrate & Storage Calculator</h2>
+                <p class="text-slate-600 mt-2">Estimate hard drive requirements based on resolution and modern compression settings.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Parameters</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Number of Cameras</label>
+                            <input type="number" id="calc-cams" value="8" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" oninput="calculateStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Resolution</label>
+                            <select id="calc-res" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" onchange="calculateStorage()">
+                                <option value="2">1080p (2MP)</option>
+                                <option value="4">4MP (2K)</option>
+                                <option value="8">8MP (4K)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Frame Rate (FPS)</label>
+                            <select id="calc-fps" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" onchange="calculateStorage()">
+                                <option value="15">15 FPS (Standard)</option>
+                                <option value="30">30 FPS (Smooth)</option>
+                                <option value="60">60 FPS (High Speed)</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-slate-700">Compression Type</label>
+                            <select id="calc-codec" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" onchange="calculateStorage()">
+                                <option value="1">H.264 (Standard)</option>
+                                <option value="0.5">H.265 (High Efficiency)</option>
+                                <option value="0.3">Smart H.265+ / Zipstream (Ultra)</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-slate-700">Retention (Days)</label>
+                            <input type="number" id="calc-days" value="30" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border" oninput="calculateStorage()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 text-white p-6 rounded-xl shadow-lg flex flex-col justify-center items-center text-center">
+                    <div class="text-sm font-medium text-slate-300 uppercase tracking-widest mb-2">Estimated Storage</div>
+                    <div id="calc-result" class="text-5xl font-bold text-white mb-2">0 TB</div>
+                    <div class="text-slate-400 text-sm">Required Total Capacity</div>
+                    <hr class="w-full border-slate-600 my-6">
+                    <div class="grid grid-cols-2 w-full gap-4">
+                         <div>
+                            <div class="text-xs text-slate-400">Total Bandwidth</div>
+                            <div id="calc-bandwidth" class="text-xl font-bold text-blue-400">0 Mbps</div>
+                         </div>
+                         <div>
+                             <div class="text-xs text-slate-400">Per Camera</div>
+                             <div id="calc-percam" class="text-xl font-bold text-green-400">0 Mbps</div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm text-slate-400">
+                Generated Guide for Security Surveillance Optimization. Data based on typical industry sensor characteristics.
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // --- DATA & STATE ---
+        const scenarios = {
+            'lobby': {
+                name: "High Contrast Lobby",
+                shutter: "1/30s - 1/60s",
+                shutterVal: 30, // % bar width
+                gain: "Low (10-20)",
+                gainVal: 20,
+                wdr: "ON (120dB+)",
+                wdrColor: "bg-green-100 text-green-700",
+                special: "Indoor Profile",
+                desc: "Strong backlight from glass doors requires WDR to prevent silhouetting. Standard shutter speed is acceptable as walking speed is moderate.",
+                insight: "The histogram displays a bimodal distribution: a peak for the dark interior and a peak for the bright outdoors. WDR merges these to fill the mid-tones.",
+                chartData: [5, 10, 15, 30, 40, 50, 45, 30, 20, 20, 30, 60, 80, 70, 40, 10] // Bimodal
+            },
+            'lpr': {
+                name: "License Plate (LPR)",
+                shutter: "1/1000s - 1/2000s",
+                shutterVal: 90,
+                gain: "Medium (AGC On)",
+                gainVal: 50,
+                wdr: "OFF (Usually)",
+                wdrColor: "bg-red-100 text-red-700",
+                special: "HLC: ON",
+                desc: "Fast shutter is critical to freeze motion. HLC masks bright headlights. WDR is often disabled to prevent ghosting on fast moving plates.",
+                insight: "The histogram is shifted left (darker) because the high shutter speed cuts light. This is intentional; we only care about the reflective plate, which will appear as a bright spike.",
+                chartData: [60, 80, 70, 50, 30, 10, 5, 2, 2, 5, 20, 50, 30, 10, 5, 0] // Dark with spike
+            },
+            'perimeter': {
+                name: "Dark Perimeter Night",
+                shutter: "1/4s - 1/30s",
+                shutterVal: 10,
+                gain: "High (Max 80)",
+                gainVal: 80,
+                wdr: "OFF",
+                wdrColor: "bg-slate-100 text-slate-700",
+                special: "Smart IR: ON",
+                desc: "Slow shutter allows more light but risks blur. High gain adds noise (snow), which Smart Codecs must suppress. IR illumination is primary light source.",
+                insight: "The histogram is heavily weighted to the darks, with a small bump in the mids provided by the IR illuminator. Noise appears as random low-level data.",
+                chartData: [40, 50, 60, 40, 20, 15, 10, 5, 2, 1, 0, 0, 0, 0, 0, 0] // Very dark
+            },
+            'retail': {
+                name: "Retail / POS",
+                shutter: "1/60s",
+                shutterVal: 40,
+                gain: "Medium",
+                gainVal: 40,
+                wdr: "Low / Off",
+                wdrColor: "bg-yellow-100 text-yellow-700",
+                special: "Color Saturation: High",
+                desc: "Balanced lighting usually allows for standard settings. Focus is on color accuracy for identifying clothing/merchandise and face clarity.",
+                insight: "A healthy 'Bell Curve' histogram. Good distribution of lights and darks indicates a well-lit indoor environment requiring minimal algorithmic boosting.",
+                chartData: [5, 10, 20, 40, 60, 80, 90, 80, 60, 40, 20, 10, 5, 2, 1, 0] // Normal distribution
+            }
+        };
+
+        const techDetails = {
+            'wdr': {
+                title: "Wide Dynamic Range (WDR)",
+                desc: "WDR resolves contrast issues by capturing 2 or 3 frames at different exposure times (Short, Mid, Long) and stitching them together into a single composite image. This prevents bright areas (windows) from being blown out and dark areas (corners) from being crushed.",
+                list: [
+                    "<b>Digital WDR (DWDR):</b> Software-based contrast adjustment. Cheap but less effective.",
+                    "<b>True WDR (120dB):</b> Hardware-based multi-exposure. The industry standard.",
+                    "<b>Pro WDR (140dB+):</b> For extreme contrast like tunnel exits."
+                ],
+                chartType: 'line',
+                labels: ['Dark', 'Shadow', 'Midtone', 'Highlight', 'Bright'],
+                datasets: [
+                    { label: 'Standard Sensor', data: [0, 20, 100, 255, 255], borderColor: '#94a3b8', tension: 0.4 },
+                    { label: 'WDR Enabled', data: [10, 40, 120, 200, 240], borderColor: '#3b82f6', tension: 0.4, borderWidth: 3 }
+                ]
+            },
+            'hlc': {
+                title: "High Light Compensation (HLC)",
+                desc: "HLC detects the brightest pixels in an image (usually headlights or flashlights) and digitally masks them (turns them black or gray) or reduces their sensitivity. This prevents the bright light from 'blooming' and obscuring surrounding details like license plates.",
+                list: [
+                    "<b>Primary Use:</b> License Plate Recognition (LPR) at night.",
+                    "<b>Trade-off:</b> The rest of the image may become darker as the camera adjusts to the masked highlight.",
+                    "<b>Smart HLC:</b> Only activates when a threshold brightness is detected."
+                ],
+                chartType: 'bar',
+                labels: ['Background', 'Road', 'Car Body', 'Headlight', 'Plate'],
+                datasets: [
+                    { label: 'Brightness Level (Standard)', data: [20, 30, 40, 255, 255], backgroundColor: '#cbd5e1' },
+                    { label: 'Brightness Level (HLC)', data: [15, 25, 35, 100, 180], backgroundColor: '#f97316' }
+                ]
+            },
+            'dnr': {
+                title: "3D Digital Noise Reduction (DNR)",
+                desc: "Low light forces the camera to amplify the signal (Gain), which introduces 'noise' (static/grain). 2D DNR analyzes a single frame to smooth pixels. 3D DNR compares sequential frames to find static pixels vs moving noise, resulting in a cleaner image and significantly lower bandwidth usage.",
+                list: [
+                    "<b>Bandwidth Saver:</b> Noise looks like motion to compression algorithms. DNR reduces bitrate by up to 50%.",
+                    "<b>Risk:</b> Excessive 3D DNR can cause 'motion blur' or trailing behind moving objects.",
+                    "<b>Setting:</b> Keep moderate for moving scenes, high for static scenes."
+                ],
+                chartType: 'line',
+                labels: ['Frame 1', 'Frame 2', 'Frame 3', 'Frame 4', 'Frame 5'],
+                datasets: [
+                    { label: 'Noise Level (No DNR)', data: [80, 85, 78, 82, 80], borderColor: '#ef4444', borderDash: [5, 5] },
+                    { label: 'Noise Level (3D DNR)', data: [80, 50, 30, 20, 15], borderColor: '#10b981', tension: 0.4 }
+                ]
+            },
+            'roi': {
+                title: "Smart Codec & ROI (Region of Interest)",
+                desc: "Smart Codecs (H.265+, Zipstream) analyze the scene to separate 'background' (static walls) from 'foreground' (people/cars). They compress the background heavily to save storage while maintaining high quality on the moving objects.",
+                list: [
+                    "<b>Dynamic GOP:</b> Increases the time between I-frames when no motion is detected.",
+                    "<b>Dynamic Bitrate:</b> Lowers bitrate drastically during idle times.",
+                    "<b>ROI:</b> Manually drawing a box (e.g., over a door) to force high quality in that zone."
+                ],
+                chartType: 'doughnut',
+                labels: ['Background Data', 'Moving Object Data'],
+                datasets: [
+                    { label: 'Storage Usage', data: [20, 80], backgroundColor: ['#cbd5e1', '#3b82f6'] }
+                ]
+            }
+        };
+
+        // --- CHART INSTANCES ---
+        let histogramChartInstance = null;
+        let techChartInstance = null;
+
+        // --- INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadScenario('lobby');
+            calculateStorage();
+            
+            // Setup Tech Chart Initial
+            const ctxTech = document.getElementById('techChart').getContext('2d');
+            techChartInstance = new Chart(ctxTech, {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+            updateTechDetail('wdr'); // Load first tech
+        });
+
+        // --- NAVIGATION LOGIC ---
+        function navigate(viewId) {
+            // Hide all sections
+            document.querySelectorAll('main > section').forEach(el => el.classList.add('hidden'));
+            // Show target
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            
+            // Update Nav State
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('nav-active', 'text-slate-900');
+                el.classList.add('text-slate-500');
+            });
+            document.getElementById(`nav-${viewId}`).classList.add('nav-active', 'text-slate-900');
+            document.getElementById(`nav-${viewId}`).classList.remove('text-slate-500');
+
+            // Resize charts if becoming visible
+            if(viewId === 'dashboard' && histogramChartInstance) histogramChartInstance.resize();
+            if(viewId === 'tech' && techChartInstance) techChartInstance.resize();
+        }
+
+        // --- SCENARIO LOGIC ---
+        function loadScenario(key) {
+            const data = scenarios[key];
+            
+            // Update UI Text
+            document.getElementById('scenario-badge').innerText = data.name;
+            document.getElementById('val-shutter').innerText = data.shutter;
+            document.getElementById('bar-shutter').style.width = data.shutterVal + '%';
+            document.getElementById('desc-shutter').innerText = key === 'lpr' ? "Fast shutter freezes motion." : (key === 'perimeter' ? "Slow shutter gathers light." : "Standard exposure.");
+            
+            document.getElementById('val-gain').innerText = data.gain;
+            document.getElementById('bar-gain').style.width = data.gainVal + '%';
+            
+            const wdrEl = document.getElementById('val-wdr');
+            wdrEl.className = `text-xs font-bold px-2 py-1 rounded ${data.wdrColor}`;
+            wdrEl.innerText = data.wdr;
+            
+            document.getElementById('val-special').innerText = data.special;
+            document.getElementById('scenario-insight').innerText = data.insight;
+
+            // Highlight Active Button
+            document.querySelectorAll('[id^="btn-"]').forEach(b => {
+                b.classList.remove('tab-active', 'border-l-4', 'border-blue-500');
+                b.classList.add('border-slate-200');
+            });
+            const activeBtn = document.getElementById(`btn-${key}`);
+            activeBtn.classList.add('tab-active');
+
+            // Update Histogram Chart
+            updateHistogram(data.chartData);
+        }
+
+        function updateHistogram(dataPoints) {
+            const ctx = document.getElementById('histogramChart').getContext('2d');
+            
+            if (histogramChartInstance) {
+                histogramChartInstance.destroy();
+            }
+
+            histogramChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['0', '16', '32', '48', '64', '80', '96', '112', '128', '144', '160', '176', '192', '208', '224', '255'],
+                    datasets: [{
+                        label: 'Pixel Density',
+                        data: dataPoints,
+                        backgroundColor: (context) => {
+                            const index = context.dataIndex;
+                            // Gradient color representation: Dark (Black) -> Mid (Blue) -> Bright (White/Blue)
+                            const value = index / 15; 
+                            return `rgba(${59 + (value * 100)}, ${130 + (value * 50)}, ${246}, 0.8)`;
+                        },
+                        borderRadius: 4,
+                        barPercentage: 1.0,
+                        categoryPercentage: 1.0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, title: { display: true, text: 'Dark <--------> Bright' } },
+                        y: { display: false }
+                    },
+                    animation: {
+                        duration: 800,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+
+        // --- TECH DETAIL LOGIC ---
+        function updateTechDetail(key) {
+            const data = techDetails[key];
+            document.getElementById('tech-title').innerText = data.title;
+            document.getElementById('tech-desc').innerHTML = data.desc;
+            
+            const listContainer = document.getElementById('tech-list');
+            listContainer.innerHTML = '';
+            data.list.forEach(item => {
+                const li = document.createElement('li');
+                li.className = "flex items-start mb-2";
+                li.innerHTML = `<span class="mr-2 mt-1 text-blue-500">➤</span> <span>${item}</span>`;
+                listContainer.appendChild(li);
+            });
+
+            // Update Tech Chart
+            if (techChartInstance) {
+                techChartInstance.destroy();
+            }
+            const ctx = document.getElementById('techChart').getContext('2d');
+            techChartInstance = new Chart(ctx, {
+                type: data.chartType,
+                data: {
+                    labels: data.labels,
+                    datasets: data.datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        // --- CALCULATOR LOGIC ---
+        function calculateStorage() {
+            const cams = parseInt(document.getElementById('calc-cams').value) || 0;
+            const res = parseInt(document.getElementById('calc-res').value) || 2;
+            const fps = parseInt(document.getElementById('calc-fps').value) || 15;
+            const codec = parseFloat(document.getElementById('calc-codec').value) || 1;
+            const days = parseInt(document.getElementById('calc-days').value) || 30;
+
+            // Base bitrate formula approximation (in Mbps) per camera
+            // 2MP @ 15fps h.264 ~ 2Mbps
+            let baseBitrate = res * (fps / 15); 
+            
+            // Apply codec efficiency
+            let finalBitrate = baseBitrate * codec;
+            
+            // Total bandwidth
+            let totalBandwidthMbps = finalBitrate * cams;
+            
+            // Total Storage: Mbps -> MB/s -> GB/day -> TB total
+            // Mbps / 8 = MB/s
+            // MB/s * 3600 * 24 = MB/day
+            // MB/day / 1000 / 1000 = TB/day
+            const mbPerSec = totalBandwidthMbps / 8;
+            const mbPerDay = mbPerSec * 86400;
+            const tbPerDay = mbPerDay / 1000000;
+            const totalTB = tbPerDay * days;
+
+            // Update DOM
+            document.getElementById('calc-result').innerText = totalTB.toFixed(2) + " TB";
+            document.getElementById('calc-bandwidth').innerText = totalBandwidthMbps.toFixed(1) + " Mbps";
+            document.getElementById('calc-percam').innerText = finalBitrate.toFixed(1) + " Mbps";
+        }
+
+    </script>
+</body>
+</html>

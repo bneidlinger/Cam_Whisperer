@@ -430,10 +430,10 @@ class CameraCurrentSettings:
     def from_dict(cls, camera_id: str, data: Dict[str, Any]) -> "CameraCurrentSettings":
         return cls(
             camera_id=camera_id,
-            stream=StreamSettings.from_dict(data.get("stream", {})),
-            exposure=ExposureSettings.from_dict(data.get("exposure", {})),
-            low_light=LowLightSettings.from_dict(data.get("lowLight", {})),
-            image=ImageSettings.from_dict(data.get("image", {})),
+            stream=StreamSettings.from_dict(data.get("stream") or {}),
+            exposure=ExposureSettings.from_dict(data.get("exposure") or {}),
+            low_light=LowLightSettings.from_dict(data.get("lowLight") or {}),
+            image=ImageSettings.from_dict(data.get("image") or {}),
             source=data.get("source", "onvif"),
         )
 

@@ -4,7 +4,12 @@
       "Bash(venvScriptspip show wsdiscovery)",
       "Bash(venv/Scripts/pip.exe:*)",
       "Bash(dir C:projectscam_whisperer)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(cat:*)",
+      "Bash(wc:*)",
+      "Bash(curl:*)",
+      "Bash(backend/venv/Scripts/python.exe -m pytest tests/backend/test_optimization.py -v --tb=short)",
+      "Bash(./venv/Scripts/python.exe:*)"
     ],
     "deny": [],
     "ask": []

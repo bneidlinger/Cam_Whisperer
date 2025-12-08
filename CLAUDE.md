@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**PlatoniCam** (v0.3.2) is a camera settings optimization system for surveillance/VMS deployments. It generates optimal camera configurations based on scene type, lighting, and operational requirements using Claude Vision AI with heuristic fallback.
+**PlatoniCam** (v0.4.0) is a camera settings optimization system for surveillance/VMS deployments. It generates optimal camera configurations based on scene type, lighting, and operational requirements using Claude Vision AI with heuristic fallback.
 
 **License:** Dual-licensed under AGPL v3 (open source) and Commercial (see `COMMERCIAL.md`).
 
@@ -33,11 +33,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Camera Integration**: ONVIF protocol, Hanwha WAVE VMS API
 
 Key backend files:
-- `main.py` - FastAPI app, all API endpoints, Pydantic models
+- `main.py` - FastAPI app, all API endpoints
 - `config.py` - Pydantic settings from `.env`
-- `services/optimization.py` - Claude AI integration + heuristic fallback
+- `models/pipeline.py` - Pydantic data models, enums (SceneType, CameraPurpose, etc.)
+- `errors.py` - Exception hierarchy with recovery hints
+- `services/optimization.py` - Optimization orchestration
 - `services/discovery.py` - ONVIF and WAVE camera discovery
 - `services/apply.py` - Apply settings via ONVIF/VMS
+- `services/providers/` - Provider abstraction layer:
+  - `base.py` - `OptimizationProvider` ABC
+  - `claude_provider.py` - Claude AI provider
+  - `heuristic_provider.py` - Rule-based fallback
+  - `factory.py` - Provider factory pattern
 - `integrations/claude_client.py` - Anthropic Claude API wrapper
 - `integrations/onvif_client.py` - ONVIF camera protocol client
 - `integrations/hanwha_wave_client.py` - Hanwha WAVE VMS API client
@@ -60,21 +67,33 @@ cd backend
 
 # Setup (first time)
 python -m venv venv
-venv\Scripts\activate  # Windows: venv\Scripts\activate
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 cp .env.example .env   # Edit and add ANTHROPIC_API_KEY
 
 # Run development server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Run tests (from project root)
-cd ..
-pytest tests/
-pytest tests/backend/test_optimization.py  # Single file
+# Quick start (Windows) - handles venv, deps, config
+.\start.bat
+# Or PowerShell with full validation:
+.\start.ps1
+```
 
-# Code formatting
-black .
-ruff check .
+### Testing
+```bash
+# From project root (with backend venv activated)
+pytest tests/                                          # All tests
+pytest tests/backend/test_optimization.py              # Single file
+pytest tests/backend/test_optimization.py -k "heuristic"  # Pattern match
+pytest tests/ --cov=backend --cov-report=html          # With coverage
+```
+
+### Code Quality
+```bash
+black .        # Format
+ruff check .   # Lint
 ```
 
 ### Deployment
@@ -95,6 +114,7 @@ Backend: See `backend/README.md` for Render/Railway deployment
 | `/api/wave/discover` | GET | Hanwha WAVE VMS camera discovery |
 | `/api/wave/cameras/{id}/capabilities` | GET | Query capabilities via WAVE |
 | `/api/wave/cameras/{id}/current-settings` | GET | Query current settings via WAVE |
+| `/api/providers` | GET | List available optimization providers |
 
 API docs: `http://localhost:8000/docs` (Swagger UI)
 
@@ -132,21 +152,29 @@ The frontend organizes cameras into **Sites** (projects/groups). Each site conta
 ## Code Modification Guidelines
 
 ### Adding Scene Types
-1. Add option to `#scene-type` select in `index.html`
-2. Add case in `basicHeuristicEngine` (frontend) and `services/optimization.py` (backend)
+1. Add to `SceneType` enum in `models/pipeline.py`
+2. Add option to `#scene-type` select in `index.html`
+3. Add case in `basicHeuristicEngine` (frontend) and `services/providers/heuristic_provider.py` (backend)
 
 ### Adding Purposes
-1. Add option to `#purpose` select in `index.html`
-2. Add case in purpose switch in both heuristic engines
+1. Add to `CameraPurpose` enum in `models/pipeline.py`
+2. Add option to `#purpose` select in `index.html`
+3. Add case in purpose switch in both heuristic engines
 
 ### Modifying AI Prompt
-Edit the prompt template in `services/optimization.py` (`_build_optimization_prompt` method)
+Edit `_build_optimization_prompt()` in `services/providers/claude_provider.py`
+
+### Adding a New Optimization Provider
+1. Create class implementing `OptimizationProvider` ABC from `services/providers/base.py`
+2. Implement `info`, `optimize()`, and `is_available()` methods
+3. Register in `services/providers/factory.py`
 
 ### Adding VMS Integration
 1. Add client in `integrations/` (e.g., `integrations/new_vms_client.py`)
 2. Add discovery methods in `services/discovery.py`
 3. Add apply adapter in `services/apply.py`
-4. Add endpoints in `main.py`
+4. Add `ApplyMethod` enum value in `models/pipeline.py`
+5. Add endpoints in `main.py`
 
 ## Environment Variables
 

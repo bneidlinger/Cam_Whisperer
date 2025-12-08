@@ -294,12 +294,12 @@ class HeuristicOptimizationProvider(OptimizationProvider):
         """Get baseline low-light settings"""
         if current and current.low_light:
             return LowLightSettings(
-                mode=current.low_light.mode,
                 ir_mode=current.low_light.ir_mode or "Auto",
-                ir_level=current.low_light.ir_level,
+                ir_intensity=current.low_light.ir_intensity,
+                day_night_mode=current.low_light.day_night_mode or "Auto",
                 sensitivity=current.low_light.sensitivity,
-                slow_shutter=current.low_light.slow_shutter,
-                dnr=current.low_light.dnr,
+                slow_shutter=current.low_light.slow_shutter or "Off",
+                dnr=current.low_light.dnr or "Medium",
             )
         return LowLightSettings(
             ir_mode="Auto",

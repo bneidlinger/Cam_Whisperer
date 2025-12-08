@@ -33,16 +33,18 @@ from errors import (
 from config import get_settings
 
 # Lazy imports to avoid circular dependencies when anthropic is not installed
-ClaudeClient = None
+ClaudeVisionClient = None
 
 def _get_claude_client():
     """Lazy load Claude client"""
-    global ClaudeClient
+    global ClaudeVisionClient
     try:
-        from integrations.claude_client import get_claude_client, ClaudeClient as CC
-        ClaudeClient = CC
+        from integrations.claude_client import get_claude_client, ClaudeVisionClient as CVC
+        ClaudeVisionClient = CVC
         return get_claude_client()
-    except ImportError:
+    except ImportError as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not load Claude client: {e}")
         return None
 
 logger = logging.getLogger(__name__)
@@ -117,7 +119,7 @@ class ClaudeOptimizationProvider(OptimizationProvider):
                 "sceneType": camera.scene_type.value if camera.scene_type else None,
                 "purpose": camera.purpose.value if camera.purpose else None,
                 "location": camera.location,
-                "manufacturer": camera.manufacturer,
+                "manufacturer": camera.vendor,  # CameraContext uses 'vendor'
                 "model": camera.model,
             }
 
@@ -185,12 +187,12 @@ class ClaudeOptimizationProvider(OptimizationProvider):
         if "stream" in settings_dict:
             s = settings_dict["stream"]
             stream = StreamSettings(
-                resolution=s.get("resolution"),
-                fps=s.get("fps"),
-                codec=s.get("codec"),
-                bitrate_mode=s.get("bitrateMode"),
-                bitrate_mbps=s.get("bitrateMbps"),
-                gop_seconds=s.get("gopSeconds"),
+                resolution=s.get("resolution", "1920x1080"),
+                fps=s.get("fps", 15),
+                codec=s.get("codec", "H.264"),
+                bitrate_mode=s.get("bitrateMode", "VBR"),
+                bitrate_mbps=s.get("bitrateMbps", 4.0),
+                gop_size=s.get("gopSize") or s.get("gopSeconds"),
                 profile=s.get("profile"),
             )
 
@@ -198,11 +200,11 @@ class ClaudeOptimizationProvider(OptimizationProvider):
         if "exposure" in settings_dict:
             e = settings_dict["exposure"]
             exposure = ExposureSettings(
-                mode=e.get("mode"),
+                mode=e.get("mode", "Auto"),
                 shutter=e.get("shutter"),
                 gain_limit=e.get("gainLimit"),
-                wdr=e.get("wdr"),
-                blc=e.get("blc"),
+                wdr=e.get("wdr", "Off"),
+                blc=e.get("blc", "Off"),
                 hlc=e.get("hlc"),
             )
 
@@ -210,31 +212,31 @@ class ClaudeOptimizationProvider(OptimizationProvider):
         if "lowLight" in settings_dict:
             ll = settings_dict["lowLight"]
             low_light = LowLightSettings(
-                mode=ll.get("mode"),
-                ir_mode=ll.get("irMode"),
-                ir_level=ll.get("irLevel"),
+                ir_mode=ll.get("irMode", "Auto"),
+                ir_intensity=ll.get("irIntensity") or ll.get("irLevel"),
+                day_night_mode=ll.get("dayNightMode", "Auto"),
                 sensitivity=ll.get("sensitivity"),
-                slow_shutter=ll.get("slowShutter"),
-                dnr=ll.get("dnr"),
+                slow_shutter=ll.get("slowShutter", "Off"),
+                dnr=ll.get("dnr", "Medium"),
             )
 
         image = None
         if "image" in settings_dict:
             i = settings_dict["image"]
             image = ImageSettings(
-                brightness=i.get("brightness"),
-                contrast=i.get("contrast"),
-                saturation=i.get("saturation"),
-                sharpness=i.get("sharpness"),
-                white_balance=i.get("whiteBalance"),
+                brightness=i.get("brightness", 50),
+                contrast=i.get("contrast", 50),
+                saturation=i.get("saturation", 50),
+                sharpness=i.get("sharpness", 50),
+                white_balance=i.get("whiteBalance", "Auto"),
                 defog=i.get("defog"),
             )
 
         return RecommendedSettings(
-            stream=stream,
-            exposure=exposure,
-            low_light=low_light,
-            image=image,
+            stream=stream or StreamSettings(),
+            exposure=exposure or ExposureSettings(),
+            low_light=low_light or LowLightSettings(),
+            image=image or ImageSettings(),
         )
 
     def _generate_warnings(

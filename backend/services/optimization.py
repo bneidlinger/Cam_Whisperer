@@ -87,7 +87,7 @@ class OptimizationService:
             # Parse inputs into typed models
             camera_ctx = self._parse_camera_context(camera)
             caps = self._parse_capabilities(capabilities)
-            current = self._parse_current_settings(current_settings)
+            current = self._parse_current_settings(camera_id, current_settings)
             opt_context = self._parse_optimization_context(context)
 
             # Store in pipeline context
@@ -240,7 +240,7 @@ class OptimizationService:
             "location": camera.get("location", "Unknown"),
             "sceneType": scene_type_val,
             "purpose": purpose_val,
-            "vendor": camera.get("manufacturer"),
+            "vendor": camera.get("vendor") or camera.get("manufacturer"),
             "model": camera.get("model"),
         })
 
@@ -249,12 +249,12 @@ class OptimizationService:
         return CameraCapabilities.from_dict(caps)
 
     def _parse_current_settings(
-        self, settings: Dict[str, Any]
+        self, camera_id: str, settings: Dict[str, Any]
     ) -> Optional[CameraCurrentSettings]:
         """Parse current settings dict to typed CameraCurrentSettings"""
         if not settings:
             return None
-        return CameraCurrentSettings.from_dict(settings)
+        return CameraCurrentSettings.from_dict(camera_id, settings)
 
     def _parse_optimization_context(
         self, context: Dict[str, Any]

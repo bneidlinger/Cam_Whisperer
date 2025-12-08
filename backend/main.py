@@ -1,10 +1,12 @@
 # backend/main.py
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import datetime
 import logging
+import traceback
 
 from config import get_settings
 from services.optimization import get_optimization_service
@@ -36,6 +38,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global exception handler to ensure errors return proper JSON with CORS headers
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch all unhandled exceptions and return proper JSON response"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "type": type(exc).__name__,
+            "traceback": traceback.format_exc() if settings.debug else None
+        }
+    )
 
 # ---- Startup event ----
 
@@ -81,26 +97,39 @@ class StreamSettings(BaseModel):
     codec: Optional[str] = None
     fps: Optional[int] = None
     bitrateMbps: Optional[float] = None
+    bitrateMode: Optional[str] = None
+    gopSize: Optional[int] = None
     keyframeInterval: Optional[int] = None
     cbr: Optional[bool] = None
+    profile: Optional[str] = None
 
 class ExposureSettings(BaseModel):
+    mode: Optional[str] = None
     shutter: Optional[str] = None
     iris: Optional[str] = None
     gainLimit: Optional[str] = None
     wdr: Optional[str] = None
+    blc: Optional[str] = None
     backlightComp: Optional[str] = None
 
 class LowLightSettings(BaseModel):
     irMode: Optional[str] = None
     irIntensity: Optional[str] = None
+    dayNightMode: Optional[str] = None
+    dnr: Optional[str] = None
     noiseReduction: Optional[str] = None
     slowShutter: Optional[str] = None
 
 class ImageSettings(BaseModel):
-    sharpening: Optional[str] = None
-    contrast: Optional[str] = None
-    saturation: Optional[str] = None
+    sharpness: Optional[int] = None
+    sharpening: Optional[int] = None  # Alias for sharpness
+    contrast: Optional[int] = None
+    saturation: Optional[int] = None
+    brightness: Optional[int] = None
+    whiteBalance: Optional[str] = None
+    mirror: Optional[bool] = None
+    flip: Optional[bool] = None
+    rotation: Optional[int] = None
     dewarp: Optional[str] = None
 
 class CameraCurrentSettings(BaseModel):
@@ -118,7 +147,7 @@ class OptimizeContext(BaseModel):
 class OptimizeRequest(BaseModel):
     camera: CameraRecord
     capabilities: CameraCapabilities
-    currentSettings: CameraCurrentSettings
+    currentSettings: Optional[CameraCurrentSettings] = None
     context: OptimizeContext
 
 class OptimizeResponse(BaseModel):
@@ -287,7 +316,7 @@ async def optimize_camera(req: OptimizeRequest):
         # Convert request to dicts for service
         camera_dict = req.camera.model_dump()
         capabilities_dict = req.capabilities.model_dump()
-        current_settings_dict = req.currentSettings.model_dump()
+        current_settings_dict = req.currentSettings.model_dump() if req.currentSettings else {}
         context_dict = req.context.model_dump()
 
         # Call optimization service
@@ -299,8 +328,10 @@ async def optimize_camera(req: OptimizeRequest):
         )
 
         # Convert result back to response model
+        # Use model_validate to properly parse nested dicts into Pydantic models
+        recommended = result["recommendedSettings"]
         response = OptimizeResponse(
-            recommendedSettings=CameraCurrentSettings(**result["recommendedSettings"]),
+            recommendedSettings=CameraCurrentSettings.model_validate(recommended),
             confidence=result["confidence"],
             warnings=result["warnings"],
             explanation=result["explanation"],
@@ -318,7 +349,7 @@ async def optimize_camera(req: OptimizeRequest):
 
     except Exception as e:
         logger.error(f"Optimization failed: {e}", exc_info=True)
-        raise
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ---- Apply settings endpoints ----
 
