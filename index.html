@@ -982,6 +982,45 @@
       margin-top: 20px;
     }
 
+    /* Calculator Results */
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .result-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--orange-dark);
+      padding: 15px;
+      border-radius: 4px;
+    }
+
+    .result-item.result-highlight {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, rgba(255, 107, 26, 0.15), rgba(255, 107, 26, 0.05));
+      border-color: var(--orange-primary);
+    }
+
+    .result-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .result-value {
+      font-size: 1.4rem;
+      color: var(--orange-glow);
+      font-weight: bold;
+    }
+
+    .result-value.result-big {
+      font-size: 2rem;
+      text-shadow: 0 0 10px rgba(255, 107, 26, 0.5);
+    }
+
     /* Grid layouts */
     .grid-2 {
       display: grid;
@@ -1130,6 +1169,9 @@
           <span>HEALTH:</span>
           <span class="header-stat-value" id="health-status">--</span>
         </div>
+        <a href="landing.html" class="header-stat" style="color: var(--orange-glow); text-decoration: none; cursor: pointer;" title="Open Optimization Guide">
+          <span>[?] GUIDE</span>
+        </a>
       </div>
     </header>
 
@@ -1154,6 +1196,10 @@
           <div class="nav-item" data-section="health">
             <span class="nav-icon">~</span>
             <span class="nav-label">Health</span>
+          </div>
+          <div class="nav-item" data-section="calculator">
+            <span class="nav-icon">=</span>
+            <span class="nav-label">Calc</span>
           </div>
         </div>
         <div class="sidebar-footer">
@@ -1597,6 +1643,133 @@
                 </div>
                 <div id="health-status-grid" class="card-grid" style="display: none;">
                   <!-- Health cards populated dynamically -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== CALCULATOR SECTION ========== -->
+        <section class="section" id="section-calculator">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Storage & Bandwidth Calculator</div>
+              </div>
+              <div class="panel-body">
+                <form id="calculator-form">
+                  <div class="form-section">
+                    <div class="section-header">// Camera Configuration</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Number of Cameras</label>
+                        <input type="number" id="calc-cameras" value="8" min="1" max="1000" />
+                      </div>
+                      <div class="form-group">
+                        <label>Resolution</label>
+                        <select id="calc-resolution">
+                          <option value="2">1080p (2MP)</option>
+                          <option value="4">4MP (2K)</option>
+                          <option value="5">5MP</option>
+                          <option value="8">8MP (4K)</option>
+                          <option value="12">12MP</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Frame Rate (FPS)</label>
+                        <select id="calc-fps">
+                          <option value="10">10 FPS</option>
+                          <option value="15" selected>15 FPS (Standard)</option>
+                          <option value="20">20 FPS</option>
+                          <option value="25">25 FPS</option>
+                          <option value="30">30 FPS (Smooth)</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Recording Hours/Day</label>
+                        <select id="calc-hours">
+                          <option value="8">8 hours (business)</option>
+                          <option value="12">12 hours</option>
+                          <option value="24" selected>24 hours (continuous)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
+                    <div class="section-header">// Compression & Retention</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Codec / Compression</label>
+                        <select id="calc-codec">
+                          <option value="1.0">H.264 (Standard)</option>
+                          <option value="0.5" selected>H.265 (High Efficiency)</option>
+                          <option value="0.3">H.265+ / Zipstream (Ultra)</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label>Retention (Days)</label>
+                        <input type="number" id="calc-retention" value="30" min="1" max="365" />
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Scene Activity</label>
+                        <select id="calc-activity">
+                          <option value="0.6">Low (static scenes)</option>
+                          <option value="0.8" selected>Medium (normal traffic)</option>
+                          <option value="1.0">High (busy areas)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="action-bar">
+                    <button type="button" class="btn" id="calc-calculate-btn">Calculate</button>
+                    <button type="button" class="btn btn-secondary" id="calc-from-site-btn">Use Site Cameras</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Estimates</div>
+              </div>
+              <div class="panel-body">
+                <div id="calc-results" class="empty-state">
+                  <div class="empty-state-icon">=</div>
+                  <div class="empty-state-text">Configure parameters and click Calculate</div>
+                </div>
+                <div id="calc-output" style="display: none;">
+                  <div class="result-grid">
+                    <div class="result-item">
+                      <div class="result-label">Per Camera Bitrate</div>
+                      <div class="result-value" id="calc-per-camera">-- Mbps</div>
+                    </div>
+                    <div class="result-item">
+                      <div class="result-label">Total Bandwidth</div>
+                      <div class="result-value" id="calc-bandwidth">-- Mbps</div>
+                    </div>
+                    <div class="result-item">
+                      <div class="result-label">Daily Storage</div>
+                      <div class="result-value" id="calc-daily">-- GB</div>
+                    </div>
+                    <div class="result-item result-highlight">
+                      <div class="result-label">Total Storage Required</div>
+                      <div class="result-value result-big" id="calc-total">-- TB</div>
+                    </div>
+                  </div>
+                  <div class="calc-notes" style="margin-top: 20px; padding: 15px; background: var(--bg-secondary); border: 1px solid var(--orange-dark); border-radius: 4px;">
+                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 10px;">// NOTES</div>
+                    <ul style="font-size: 0.8rem; color: var(--text-dim); margin: 0; padding-left: 20px;">
+                      <li>Add 20% overhead for filesystem and redundancy</li>
+                      <li>Smart codecs (H.265+/Zipstream) can reduce storage by 50-70%</li>
+                      <li>VBR with motion-based recording can reduce further</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3352,6 +3525,56 @@
       updateUI();
       showToast('Health check complete');
     });
+
+    // ---- Storage Calculator ----
+    document.getElementById('calc-calculate-btn').addEventListener('click', () => {
+      calculateStorageEstimate();
+    });
+
+    document.getElementById('calc-from-site-btn').addEventListener('click', () => {
+      const cameras = getCurrentCameras();
+      if (!cameras || cameras.length === 0) {
+        showToast('No cameras in current site');
+        return;
+      }
+      document.getElementById('calc-cameras').value = cameras.length;
+      calculateStorageEstimate();
+    });
+
+    function calculateStorageEstimate() {
+      const cameras = parseInt(document.getElementById('calc-cameras').value) || 1;
+      const resolution = parseFloat(document.getElementById('calc-resolution').value) || 2;
+      const fps = parseInt(document.getElementById('calc-fps').value) || 15;
+      const hours = parseInt(document.getElementById('calc-hours').value) || 24;
+      const codec = parseFloat(document.getElementById('calc-codec').value) || 1.0;
+      const retention = parseInt(document.getElementById('calc-retention').value) || 30;
+      const activity = parseFloat(document.getElementById('calc-activity').value) || 0.8;
+
+      // Base bitrate calculation (Mbps)
+      // 2MP @ 15fps H.264 VBR ~ 2 Mbps average
+      const baseBitrate = resolution * (fps / 15) * activity;
+      const perCameraBitrate = baseBitrate * codec;
+      const totalBandwidth = perCameraBitrate * cameras;
+
+      // Storage calculation
+      // Mbps -> MB/s = Mbps / 8
+      // MB/hour = MB/s * 3600
+      // GB/day = MB/hour * hours / 1000
+      // TB total = GB/day * retention / 1000
+      const mbPerSecond = totalBandwidth / 8;
+      const gbPerDay = (mbPerSecond * 3600 * hours) / 1000;
+      const tbTotal = (gbPerDay * retention) / 1000;
+
+      // Update UI
+      document.getElementById('calc-per-camera').textContent = perCameraBitrate.toFixed(1) + ' Mbps';
+      document.getElementById('calc-bandwidth').textContent = totalBandwidth.toFixed(1) + ' Mbps';
+      document.getElementById('calc-daily').textContent = gbPerDay.toFixed(0) + ' GB';
+      document.getElementById('calc-total').textContent = tbTotal.toFixed(2) + ' TB';
+
+      // Show results
+      document.getElementById('calc-results').style.display = 'none';
+      document.getElementById('calc-output').style.display = 'block';
+    }
 
     // ---- Utilities ----
     function escapeHtml(text) {

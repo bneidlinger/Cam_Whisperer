@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Landing Page & Documentation
+- **Added** `landing.html` - GitHub Pages landing/guide page
+  - Interactive scenario simulator (Lobby, LPR, Perimeter, Retail)
+  - Technology deep dive section (WDR, HLC, DNR, Smart Codec)
+  - Manufacturer settings translation matrix (Hikvision, Axis, Dahua, Hanwha)
+  - Storage/bandwidth calculator
+  - PlatoniCam branding with dark theme and orange accents
+  - Links to main app (`index.html`)
+
+#### HLC (High Light Compensation) Support
+- **Added** HLC field handling in `claude_provider.py`
+- **Added** HLC to heuristic rules:
+  - PLATES purpose: HLC On (masks headlight glare)
+  - PARKING scene: HLC On (incoming vehicle headlights)
+- **Updated** `_apply_purpose_rule()` to apply HLC settings
+- **Updated** `_apply_scene_rule()` to apply HLC settings
+
+#### Enhanced LPR/Plates Optimization
+- **Enhanced** PLATES purpose rule with research-based settings:
+  - FPS: 25 (up from 20)
+  - Shutter: 1/500 (fixed, was range)
+  - WDR: Off (prevents ghosting on fast-moving plates)
+  - HLC: On (masks headlight glare)
+  - Gain Limit: 24 dB (limits noise, prioritizes fast shutter)
+  - Updated explanation with detailed reasoning
+
+#### Storage Calculator (Frontend)
+- **Added** "Calc" navigation item in sidebar
+- **Added** Calculator section with inputs:
+  - Number of cameras, resolution, FPS, recording hours
+  - Codec type (H.264, H.265, H.265+/Zipstream)
+  - Retention days, scene activity level
+- **Added** Results panel: per-camera bitrate, total bandwidth, daily storage, total TB
+- **Added** "Use Site Cameras" button to auto-populate camera count
+- **Added** CSS styling for result display
+
+#### UI Improvements
+- **Added** `[?] GUIDE` link in main app header linking to landing page
+
+### Changed
+- **Updated** PARKING scene rule to include HLC
+
 ---
 
 ## [0.4.0] - 2025-12-07

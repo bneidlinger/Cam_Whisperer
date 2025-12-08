@@ -33,10 +33,13 @@ logger = logging.getLogger(__name__)
 # Heuristic rule definitions
 PURPOSE_RULES: Dict[CameraPurpose, Dict[str, Any]] = {
     CameraPurpose.PLATES: {
-        "min_fps": 20,
-        "shutter": "1/250 to 1/500",
+        "min_fps": 25,
+        "shutter": "1/500",
         "slow_shutter": "Off",
-        "explanation": "License plate recognition requires fast shutter to prevent motion blur",
+        "wdr": "Off",  # WDR causes ghosting on fast-moving plates
+        "hlc": "On",  # Mask headlight glare
+        "gain_limit": 24,  # Limit noise, prioritize fast shutter
+        "explanation": "License plate recognition requires fast shutter (1/500+) to freeze motion. HLC masks headlight glare. WDR disabled to prevent ghosting artifacts on moving vehicles.",
     },
     CameraPurpose.FACIAL: {
         "min_fps": 20,
@@ -78,8 +81,9 @@ SCENE_RULES: Dict[SceneType, Dict[str, Any]] = {
     },
     SceneType.PARKING: {
         "wdr": "Medium",
+        "hlc": "On",  # Mask headlight glare from incoming vehicles
         "ir_mode": "Auto",
-        "explanation": "Parking areas need good low-light and WDR for headlights",
+        "explanation": "Parking areas need HLC for headlight glare and WDR for mixed lighting conditions",
     },
     SceneType.EXTERIOR_NIGHT: {
         "ir_mode": "Auto",
@@ -350,6 +354,15 @@ class HeuristicOptimizationProvider(OptimizationProvider):
         if "bitrate_mode" in rule:
             stream.bitrate_mode = rule["bitrate_mode"]
 
+        if "wdr" in rule:
+            exposure.wdr = rule["wdr"]
+
+        if "hlc" in rule:
+            exposure.hlc = rule["hlc"]
+
+        if "gain_limit" in rule:
+            exposure.gain_limit = rule["gain_limit"]
+
     def _apply_scene_rule(
         self,
         rule: Dict[str, Any],
@@ -361,6 +374,9 @@ class HeuristicOptimizationProvider(OptimizationProvider):
         """Apply scene-type based rules"""
         if "wdr" in rule:
             exposure.wdr = rule["wdr"]
+
+        if "hlc" in rule:
+            exposure.hlc = rule["hlc"]
 
         if "ir_mode" in rule:
             low_light.ir_mode = rule["ir_mode"]

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlatoniCam - Security Camera Optimization Guide</title>
+    <meta name="description" content="AI-powered security camera settings optimization. Learn about WDR, HLC, DNR, and generate optimal configurations for any surveillance scenario.">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e8e8e8; }
+        .mono { font-family: 'Share Tech Mono', monospace; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            height: 300px;
+        }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        .nav-active { border-bottom: 2px solid #ff6b1a; color: #ff6b1a; font-weight: 600; }
+        .tab-active { background-color: rgba(255, 107, 26, 0.15); color: #ff8c42; border-left: 4px solid #ff6b1a; }
+        .card-shadow { box-shadow: 0 4px 20px rgba(255, 107, 26, 0.1); }
+        .glow-orange { box-shadow: 0 0 30px rgba(255, 107, 26, 0.3); }
+        .border-glow { border-color: #ff6b1a; box-shadow: 0 0 10px rgba(255, 107, 26, 0.3); }
+        .bg-panel { background-color: #1a1a1a; }
+        .text-orange { color: #ff8c42; }
+        .bg-orange { background-color: #ff6b1a; }
+        .hover-glow:hover { box-shadow: 0 0 20px rgba(255, 107, 26, 0.4); }
+        /* Scan line effect */
+        .scanlines::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 107, 26, 0.02) 2px,
+                rgba(255, 107, 26, 0.02) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.5;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'panel': '#1a1a1a',
+                        'orange-primary': '#ff6b1a',
+                        'orange-glow': '#ff8c42',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen flex flex-col scanlines">
+
+    <!-- Navigation -->
+    <nav class="bg-panel border-b-2 border-orange-primary sticky top-0 z-50 glow-orange">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl mr-2">📷</span>
+                    <span class="text-xl font-bold text-orange-glow mono">PlatoniCam</span>
+                    <span class="text-xs font-normal text-gray-500 ml-3 hidden sm:inline">SECURITY OPTIMIZATION GUIDE</span>
+                </div>
+                <div class="hidden md:flex md:space-x-6 items-center">
+                    <button onclick="navigate('hero')" id="nav-hero" class="nav-active inline-flex items-center px-1 pt-1 text-sm font-medium h-full transition-colors duration-200">Home</button>
+                    <button onclick="navigate('dashboard')" id="nav-dashboard" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-400 hover:text-orange-glow h-full transition-colors duration-200">Simulator</button>
+                    <button onclick="navigate('tech')" id="nav-tech" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-400 hover:text-orange-glow h-full transition-colors duration-200">Tech Guide</button>
+                    <button onclick="navigate('manufacturers')" id="nav-manufacturers" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-400 hover:text-orange-glow h-full transition-colors duration-200">Manufacturers</button>
+                    <button onclick="navigate('calculator')" id="nav-calculator" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-400 hover:text-orange-glow h-full transition-colors duration-200">Calculator</button>
+                    <a href="index.html" class="ml-4 px-4 py-2 bg-orange-primary text-black font-bold rounded hover:bg-orange-glow transition-all hover-glow text-sm">LAUNCH APP</a>
+                </div>
+                <!-- Mobile menu button -->
+                <div class="md:hidden flex items-center">
+                    <a href="index.html" class="px-3 py-1 bg-orange-primary text-black font-bold rounded text-xs">APP</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- HERO SECTION -->
+        <section id="view-hero" class="space-y-12 animate-fade-in">
+            <div class="text-center max-w-4xl mx-auto py-16">
+                <div class="mono text-orange-primary text-sm tracking-widest mb-4">AI-POWERED CAMERA OPTIMIZATION</div>
+                <h1 class="text-4xl md:text-6xl font-bold text-white tracking-tight mb-6">
+                    Perfect Settings.<br/>
+                    <span class="text-orange-glow">Every Scene.</span>
+                </h1>
+                <p class="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
+                    Stop guessing camera configurations. PlatoniCam uses Claude Vision AI to analyze your scenes
+                    and generate optimal settings for any surveillance scenario.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="index.html" class="px-8 py-4 bg-orange-primary text-black font-bold rounded-lg hover:bg-orange-glow transition-all glow-orange text-lg">
+                        LAUNCH OPTIMIZER
+                    </a>
+                    <button onclick="navigate('dashboard')" class="px-8 py-4 border-2 border-orange-primary text-orange-glow font-bold rounded-lg hover:bg-orange-primary hover:text-black transition-all">
+                        EXPLORE SIMULATOR
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feature Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                <div class="bg-panel p-6 rounded-xl border border-gray-800 hover:border-orange-primary transition-all hover-glow">
+                    <div class="text-3xl mb-4">🎯</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Scene Analysis</h3>
+                    <p class="text-gray-400 text-sm">Upload a sample frame and let Claude Vision AI identify lighting conditions, contrast challenges, and motion requirements.</p>
+                </div>
+                <div class="bg-panel p-6 rounded-xl border border-gray-800 hover:border-orange-primary transition-all hover-glow">
+                    <div class="text-3xl mb-4">⚡</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Instant Optimization</h3>
+                    <p class="text-gray-400 text-sm">Get recommended settings for shutter speed, WDR, HLC, gain, codec, and more - optimized for your specific camera and scene.</p>
+                </div>
+                <div class="bg-panel p-6 rounded-xl border border-gray-800 hover:border-orange-primary transition-all hover-glow">
+                    <div class="text-3xl mb-4">📊</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Smart Fallback</h3>
+                    <p class="text-gray-400 text-sm">Works offline too - the heuristic engine applies industry best practices when AI isn't available.</p>
+                </div>
+            </div>
+
+            <!-- Use Cases Grid -->
+            <div class="max-w-5xl mx-auto mt-16">
+                <h2 class="text-2xl font-bold text-white text-center mb-8">Optimized For Every Scenario</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">🚗</div>
+                        <div class="text-sm font-medium text-orange-glow">License Plates</div>
+                        <div class="text-xs text-gray-500">Fast shutter + HLC</div>
+                    </div>
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">🚪</div>
+                        <div class="text-sm font-medium text-orange-glow">Entrances</div>
+                        <div class="text-xs text-gray-500">High WDR</div>
+                    </div>
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">🌙</div>
+                        <div class="text-sm font-medium text-orange-glow">Night Perimeter</div>
+                        <div class="text-xs text-gray-500">Smart IR + DNR</div>
+                    </div>
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">🏪</div>
+                        <div class="text-sm font-medium text-orange-glow">Retail</div>
+                        <div class="text-xs text-gray-500">Color accuracy</div>
+                    </div>
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">🏢</div>
+                        <div class="text-sm font-medium text-orange-glow">Lobby</div>
+                        <div class="text-xs text-gray-500">Backlight handling</div>
+                    </div>
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">🅿️</div>
+                        <div class="text-sm font-medium text-orange-glow">Parking</div>
+                        <div class="text-xs text-gray-500">Mixed lighting</div>
+                    </div>
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">📦</div>
+                        <div class="text-sm font-medium text-orange-glow">Warehouse</div>
+                        <div class="text-xs text-gray-500">Wide coverage</div>
+                    </div>
+                    <div class="bg-panel p-4 rounded-lg border border-gray-800 text-center">
+                        <div class="text-2xl mb-2">🏧</div>
+                        <div class="text-sm font-medium text-orange-glow">ATM</div>
+                        <div class="text-xs text-gray-500">High detail</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Start -->
+            <div class="max-w-3xl mx-auto mt-16 bg-panel p-8 rounded-xl border border-gray-800">
+                <h2 class="text-xl font-bold text-white mb-6 text-center">Quick Start</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="text-center">
+                        <div class="w-12 h-12 rounded-full bg-orange-primary text-black font-bold text-xl flex items-center justify-center mx-auto mb-3">1</div>
+                        <h4 class="font-medium text-white mb-1">Add Camera</h4>
+                        <p class="text-sm text-gray-400">Enter camera details, scene type, and purpose</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-12 h-12 rounded-full bg-orange-primary text-black font-bold text-xl flex items-center justify-center mx-auto mb-3">2</div>
+                        <h4 class="font-medium text-white mb-1">Upload Frame</h4>
+                        <p class="text-sm text-gray-400">Optional: add a sample image for AI analysis</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-12 h-12 rounded-full bg-orange-primary text-black font-bold text-xl flex items-center justify-center mx-auto mb-3">3</div>
+                        <h4 class="font-medium text-white mb-1">Get Settings</h4>
+                        <p class="text-sm text-gray-400">Receive optimized configuration instantly</p>
+                    </div>
+                </div>
+                <div class="text-center mt-8">
+                    <a href="index.html" class="inline-block px-6 py-3 bg-orange-primary text-black font-bold rounded hover:bg-orange-glow transition-all">
+                        GET STARTED NOW
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 1: SCENARIO SIMULATOR (DASHBOARD) -->
+        <section id="view-dashboard" class="hidden space-y-8 animate-fade-in">
+            <div class="text-center max-w-3xl mx-auto mb-10">
+                <h1 class="text-3xl font-bold text-white tracking-tight">Image Optimization Simulator</h1>
+                <p class="mt-4 text-lg text-gray-400">
+                    Explore how different camera settings affect image quality across critical security scenarios.
+                    Select a scenario to see the recommended configuration.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Scenario Selector -->
+                <div class="lg:col-span-3 space-y-2">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 mono">Select Environment</h3>
+                    <button onclick="loadScenario('lobby')" id="btn-lobby" class="w-full text-left px-4 py-3 rounded-lg bg-panel hover:bg-gray-800 border border-gray-700 transition-all tab-active group">
+                        <div class="font-medium text-white">High Contrast Lobby</div>
+                        <div class="text-xs text-gray-500 mt-1">Backlight challenges</div>
+                    </button>
+                    <button onclick="loadScenario('lpr')" id="btn-lpr" class="w-full text-left px-4 py-3 rounded-lg bg-panel hover:bg-gray-800 border border-gray-700 transition-all group">
+                        <div class="font-medium text-white">License Plate (LPR)</div>
+                        <div class="text-xs text-gray-500 mt-1">Fast motion, headlight glare</div>
+                    </button>
+                    <button onclick="loadScenario('perimeter')" id="btn-perimeter" class="w-full text-left px-4 py-3 rounded-lg bg-panel hover:bg-gray-800 border border-gray-700 transition-all group">
+                        <div class="font-medium text-white">Dark Perimeter</div>
+                        <div class="text-xs text-gray-500 mt-1">Low light, long range</div>
+                    </button>
+                    <button onclick="loadScenario('retail')" id="btn-retail" class="w-full text-left px-4 py-3 rounded-lg bg-panel hover:bg-gray-800 border border-gray-700 transition-all group">
+                        <div class="font-medium text-white">Retail Point of Sale</div>
+                        <div class="text-xs text-gray-500 mt-1">Detail & color priority</div>
+                    </button>
+                </div>
+
+                <!-- Virtual Camera Config -->
+                <div class="lg:col-span-5 bg-panel rounded-xl border border-gray-700 card-shadow p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-bold text-white flex items-center mono">
+                            <span class="text-2xl mr-2">⚙️</span> Recommended Config
+                        </h2>
+                        <span id="scenario-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-primary text-black">Lobby Mode</span>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Setting: Shutter -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm font-medium text-gray-300">Shutter Speed (Exposure)</span>
+                                <span id="val-shutter" class="text-sm font-bold text-orange-glow mono">1/30s</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div id="bar-shutter" class="bg-orange-primary h-2 rounded-full transition-all duration-500" style="width: 20%"></div>
+                            </div>
+                            <p id="desc-shutter" class="text-xs text-gray-500 mt-1">Standard speed to capture natural light.</p>
+                        </div>
+
+                        <!-- Setting: Gain -->
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm font-medium text-gray-300">Gain (ISO/Sensitivity)</span>
+                                <span id="val-gain" class="text-sm font-bold text-orange-glow mono">Low (10-20)</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div id="bar-gain" class="bg-orange-primary h-2 rounded-full transition-all duration-500" style="width: 15%"></div>
+                            </div>
+                            <p id="desc-gain" class="text-xs text-gray-500 mt-1">Keep low to reduce image noise.</p>
+                        </div>
+
+                        <!-- Setting: WDR -->
+                        <div class="p-3 bg-gray-800 rounded-lg border border-gray-700">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-300">WDR (Wide Dynamic Range)</span>
+                                <span id="val-wdr" class="text-xs font-bold px-2 py-1 bg-green-900 text-green-400 rounded mono">ON (120dB)</span>
+                            </div>
+                            <p id="desc-wdr" class="text-xs text-gray-500 mt-1">Essential for balancing bright windows and dark interiors.</p>
+                        </div>
+
+                        <!-- Setting: Special -->
+                        <div class="p-3 bg-gray-800 rounded-lg border border-gray-700">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-300">Special Feature</span>
+                                <span id="val-special" class="text-xs font-bold px-2 py-1 bg-purple-900 text-purple-400 rounded mono">HLC: OFF</span>
+                            </div>
+                            <p id="desc-special" class="text-xs text-gray-500 mt-1">High Light Compensation not needed here.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualization Column -->
+                <div class="lg:col-span-4 flex flex-col space-y-6">
+                    <!-- Histogram Chart -->
+                    <div class="bg-panel rounded-xl border border-gray-700 card-shadow p-4 flex flex-col">
+                        <h3 class="text-sm font-semibold text-gray-400 mb-2 mono">Simulated Light Histogram</h3>
+                        <div class="chart-container">
+                            <canvas id="histogramChart"></canvas>
+                        </div>
+                        <p class="text-xs text-gray-500 text-center mt-2">
+                            X-Axis: Brightness (0-255) | Y-Axis: Pixel Count
+                        </p>
+                    </div>
+
+                    <!-- Insight Box -->
+                    <div class="bg-orange-900/30 border border-orange-primary/30 rounded-xl p-4">
+                        <h4 class="text-sm font-bold text-orange-glow mb-1 mono">Why this configuration?</h4>
+                        <p id="scenario-insight" class="text-sm text-gray-300 leading-relaxed">
+                            In a lobby, the camera faces bright outdoor light while monitoring a darker interior. WDR combines short and long exposures to ensure both the person entering and the background details are visible.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="text-center mt-8 pt-8 border-t border-gray-800">
+                <p class="text-gray-400 mb-4">Ready to optimize your actual cameras?</p>
+                <a href="index.html" class="inline-block px-6 py-3 bg-orange-primary text-black font-bold rounded hover:bg-orange-glow transition-all hover-glow">
+                    LAUNCH OPTIMIZER APP
+                </a>
+            </div>
+        </section>
+
+        <!-- SECTION 2: TECH DEEP DIVE -->
+        <section id="view-tech" class="hidden space-y-8 animate-fade-in">
+            <div class="mb-8 border-b border-gray-700 pb-4">
+                <h2 class="text-2xl font-bold text-white">Core Technologies Explained</h2>
+                <p class="text-gray-400 mt-2">A technical breakdown of the algorithms used to process surveillance imagery. Click cards to view comparative data.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <!-- Tech Cards -->
+                <div onclick="updateTechDetail('wdr')" class="cursor-pointer bg-panel p-5 rounded-xl border border-gray-700 hover:border-orange-primary hover:shadow-lg transition-all group">
+                    <h3 class="text-lg font-bold text-white group-hover:text-orange-glow">WDR</h3>
+                    <p class="text-xs text-gray-500 uppercase font-semibold mt-1 mono">Wide Dynamic Range</p>
+                    <p class="text-sm text-gray-400 mt-3">Combines multiple exposures to balance extreme light/dark.</p>
+                </div>
+                <div onclick="updateTechDetail('hlc')" class="cursor-pointer bg-panel p-5 rounded-xl border border-gray-700 hover:border-orange-primary hover:shadow-lg transition-all group">
+                    <h3 class="text-lg font-bold text-white group-hover:text-orange-glow">HLC</h3>
+                    <p class="text-xs text-gray-500 uppercase font-semibold mt-1 mono">High Light Compensation</p>
+                    <p class="text-sm text-gray-400 mt-3">Masks bright spots (headlights) to prevent blinding.</p>
+                </div>
+                <div onclick="updateTechDetail('dnr')" class="cursor-pointer bg-panel p-5 rounded-xl border border-gray-700 hover:border-orange-primary hover:shadow-lg transition-all group">
+                    <h3 class="text-lg font-bold text-white group-hover:text-orange-glow">3D DNR</h3>
+                    <p class="text-xs text-gray-500 uppercase font-semibold mt-1 mono">Digital Noise Reduction</p>
+                    <p class="text-sm text-gray-400 mt-3">Compares frames temporally to remove static grain.</p>
+                </div>
+                <div onclick="updateTechDetail('roi')" class="cursor-pointer bg-panel p-5 rounded-xl border border-gray-700 hover:border-orange-primary hover:shadow-lg transition-all group">
+                    <h3 class="text-lg font-bold text-white group-hover:text-orange-glow">Smart Codec</h3>
+                    <p class="text-xs text-gray-500 uppercase font-semibold mt-1 mono">H.265+ / Zipstream</p>
+                    <p class="text-sm text-gray-400 mt-3">Dynamic compression based on movement in ROI.</p>
+                </div>
+            </div>
+
+            <div class="bg-panel rounded-xl border border-gray-700 card-shadow p-6 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div>
+                    <h3 id="tech-title" class="text-2xl font-bold text-white mb-2">Wide Dynamic Range (WDR)</h3>
+                    <div class="h-1 w-20 bg-orange-primary rounded mb-4"></div>
+                    <p id="tech-desc" class="text-gray-400 mb-6 leading-relaxed">
+                        Standard cameras struggle when a scene has both very bright and very dark areas (e.g., looking out a door). The sensor either exposes for the bright outside (making the inside pitch black) or the dark inside (blowing out the outside). WDR takes 2-3 frames at different shutter speeds and merges them.
+                    </p>
+                    <ul id="tech-list" class="space-y-2 text-sm text-gray-300">
+                        <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> <b>dB Rating:</b> Higher is better (120dB is standard True WDR).</li>
+                        <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> <b>Artifacts:</b> Fast motion can cause "ghosting" in WDR mode.</li>
+                        <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> <b>Use Case:</b> Entrances, ATMs, window-facing desks.</li>
+                    </ul>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                    <h4 class="text-sm font-semibold text-gray-500 mb-4 text-center mono">Performance Impact Visualizer</h4>
+                    <div class="chart-container">
+                        <canvas id="techChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: MANUFACTURER MAPPING -->
+        <section id="view-manufacturers" class="hidden space-y-8 animate-fade-in">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-white">Manufacturer Setting Guide</h2>
+                <p class="text-gray-400 mt-2">Different brands use proprietary terms for standard technologies. Use this matrix to find the right setting in your camera's web interface.</p>
+            </div>
+
+            <div class="bg-panel border border-gray-700 rounded-xl overflow-hidden card-shadow">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-800">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider mono">Technology</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-red-400 uppercase tracking-wider">Hikvision</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Axis</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-blue-400 uppercase tracking-wider">Dahua</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Hanwha</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-700 text-sm text-gray-300">
+                            <tr class="hover:bg-gray-800 transition-colors">
+                                <td class="px-6 py-4 font-bold text-orange-glow">Smart Compression</td>
+                                <td class="px-6 py-4">H.265+</td>
+                                <td class="px-6 py-4">Zipstream</td>
+                                <td class="px-6 py-4">Smart H.265+</td>
+                                <td class="px-6 py-4">WiseStream II/III</td>
+                            </tr>
+                            <tr class="hover:bg-gray-800 transition-colors">
+                                <td class="px-6 py-4 font-bold text-orange-glow">Low Light Color</td>
+                                <td class="px-6 py-4">DarkFighter / ColorVu</td>
+                                <td class="px-6 py-4">Lightfinder</td>
+                                <td class="px-6 py-4">Starlight / Full-color</td>
+                                <td class="px-6 py-4">extraLUX</td>
+                            </tr>
+                            <tr class="hover:bg-gray-800 transition-colors">
+                                <td class="px-6 py-4 font-bold text-orange-glow">Highlight Masking</td>
+                                <td class="px-6 py-4">HLC</td>
+                                <td class="px-6 py-4">Exposure Priority</td>
+                                <td class="px-6 py-4">HLC</td>
+                                <td class="px-6 py-4">HLC</td>
+                            </tr>
+                            <tr class="hover:bg-gray-800 transition-colors">
+                                <td class="px-6 py-4 font-bold text-orange-glow">Wide Dynamic Range</td>
+                                <td class="px-6 py-4">120dB WDR</td>
+                                <td class="px-6 py-4">Forensic WDR</td>
+                                <td class="px-6 py-4">True WDR</td>
+                                <td class="px-6 py-4">WDR (150dB)</td>
+                            </tr>
+                            <tr class="hover:bg-gray-800 transition-colors">
+                                <td class="px-6 py-4 font-bold text-orange-glow">Fog/Haze Removal</td>
+                                <td class="px-6 py-4">Defog</td>
+                                <td class="px-6 py-4">Electronic Image Stab.</td>
+                                <td class="px-6 py-4">Defog</td>
+                                <td class="px-6 py-4">Defog</td>
+                            </tr>
+                            <tr class="hover:bg-gray-800 transition-colors">
+                                <td class="px-6 py-4 font-bold text-orange-glow">Backlight Compensation</td>
+                                <td class="px-6 py-4">BLC (Zone)</td>
+                                <td class="px-6 py-4">Exposure Zones</td>
+                                <td class="px-6 py-4">BLC</td>
+                                <td class="px-6 py-4">BLC</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="bg-gray-800 px-6 py-3 text-xs text-gray-500">
+                    * Menu paths may vary by firmware version. Always check the "Image" or "Video/Audio" subsystems.
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: STORAGE CALCULATOR -->
+        <section id="view-calculator" class="hidden space-y-8 animate-fade-in">
+            <div class="text-center max-w-2xl mx-auto mb-8">
+                <h2 class="text-2xl font-bold text-white">Bitrate & Storage Calculator</h2>
+                <p class="text-gray-400 mt-2">Estimate hard drive requirements based on resolution and modern compression settings.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div class="bg-panel p-6 rounded-xl border border-gray-700">
+                    <h3 class="text-lg font-bold text-white mb-4 mono">Parameters</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Number of Cameras</label>
+                            <input type="number" id="calc-cams" value="8" class="mt-1 block w-full rounded-md bg-gray-800 border-gray-600 text-white focus:border-orange-primary focus:ring-orange-primary sm:text-sm p-2 border" oninput="calculateStorage()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Resolution</label>
+                            <select id="calc-res" class="mt-1 block w-full rounded-md bg-gray-800 border-gray-600 text-white focus:border-orange-primary focus:ring-orange-primary sm:text-sm p-2 border" onchange="calculateStorage()">
+                                <option value="2">1080p (2MP)</option>
+                                <option value="4">4MP (2K)</option>
+                                <option value="8">8MP (4K)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Frame Rate (FPS)</label>
+                            <select id="calc-fps" class="mt-1 block w-full rounded-md bg-gray-800 border-gray-600 text-white focus:border-orange-primary focus:ring-orange-primary sm:text-sm p-2 border" onchange="calculateStorage()">
+                                <option value="15">15 FPS (Standard)</option>
+                                <option value="30">30 FPS (Smooth)</option>
+                                <option value="60">60 FPS (High Speed)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Compression Type</label>
+                            <select id="calc-codec" class="mt-1 block w-full rounded-md bg-gray-800 border-gray-600 text-white focus:border-orange-primary focus:ring-orange-primary sm:text-sm p-2 border" onchange="calculateStorage()">
+                                <option value="1">H.264 (Standard)</option>
+                                <option value="0.5">H.265 (High Efficiency)</option>
+                                <option value="0.3">Smart H.265+ / Zipstream (Ultra)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Retention (Days)</label>
+                            <input type="number" id="calc-days" value="30" class="mt-1 block w-full rounded-md bg-gray-800 border-gray-600 text-white focus:border-orange-primary focus:ring-orange-primary sm:text-sm p-2 border" oninput="calculateStorage()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-orange-primary text-black p-6 rounded-xl glow-orange flex flex-col justify-center items-center text-center">
+                    <div class="text-sm font-medium text-orange-900 uppercase tracking-widest mb-2 mono">Estimated Storage</div>
+                    <div id="calc-result" class="text-5xl font-bold text-black mb-2">0 TB</div>
+                    <div class="text-orange-800 text-sm">Required Total Capacity</div>
+                    <hr class="w-full border-orange-600 my-6">
+                    <div class="grid grid-cols-2 w-full gap-4">
+                        <div>
+                            <div class="text-xs text-orange-900">Total Bandwidth</div>
+                            <div id="calc-bandwidth" class="text-xl font-bold text-black mono">0 Mbps</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-orange-900">Per Camera</div>
+                            <div id="calc-percam" class="text-xl font-bold text-black mono">0 Mbps</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-panel border-t border-gray-800 mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <p class="text-sm text-gray-500 mono">
+                    PlatoniCam v0.4.0 // Dual Licensed: AGPL v3 / Commercial
+                </p>
+                <div class="flex space-x-6 mt-4 md:mt-0">
+                    <a href="index.html" class="text-sm text-orange-glow hover:text-orange-primary">Launch App</a>
+                    <a href="https://github.com/bneidlinger/cam_whisperer" class="text-sm text-gray-400 hover:text-white">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // --- DATA & STATE ---
+        const scenarios = {
+            'lobby': {
+                name: "High Contrast Lobby",
+                shutter: "1/30s - 1/60s",
+                shutterVal: 30,
+                gain: "Low (10-20)",
+                gainVal: 20,
+                wdr: "ON (120dB+)",
+                wdrColor: "bg-green-900 text-green-400",
+                special: "Indoor Profile",
+                desc: "Strong backlight from glass doors requires WDR to prevent silhouetting.",
+                insight: "The histogram displays a bimodal distribution: a peak for the dark interior and a peak for the bright outdoors. WDR merges these to fill the mid-tones.",
+                chartData: [5, 10, 15, 30, 40, 50, 45, 30, 20, 20, 30, 60, 80, 70, 40, 10]
+            },
+            'lpr': {
+                name: "License Plate (LPR)",
+                shutter: "1/500s - 1/2000s",
+                shutterVal: 90,
+                gain: "Medium (AGC On)",
+                gainVal: 50,
+                wdr: "OFF",
+                wdrColor: "bg-red-900 text-red-400",
+                special: "HLC: ON",
+                desc: "Fast shutter freezes motion. HLC masks headlights. WDR disabled to prevent ghosting.",
+                insight: "The histogram is shifted left (darker) because the fast shutter cuts light. We only care about the reflective plate, which appears as a bright spike.",
+                chartData: [60, 80, 70, 50, 30, 10, 5, 2, 2, 5, 20, 50, 30, 10, 5, 0]
+            },
+            'perimeter': {
+                name: "Dark Perimeter Night",
+                shutter: "1/4s - 1/30s",
+                shutterVal: 10,
+                gain: "High (Max 80)",
+                gainVal: 80,
+                wdr: "OFF",
+                wdrColor: "bg-gray-700 text-gray-400",
+                special: "Smart IR: ON",
+                desc: "Slow shutter gathers light but risks blur. High gain adds noise. IR is primary light source.",
+                insight: "The histogram is heavily weighted to the darks, with a small bump in the mids from IR. Noise appears as random low-level data.",
+                chartData: [40, 50, 60, 40, 20, 15, 10, 5, 2, 1, 0, 0, 0, 0, 0, 0]
+            },
+            'retail': {
+                name: "Retail / POS",
+                shutter: "1/60s",
+                shutterVal: 40,
+                gain: "Medium",
+                gainVal: 40,
+                wdr: "Low / Off",
+                wdrColor: "bg-yellow-900 text-yellow-400",
+                special: "Color Saturation: High",
+                desc: "Balanced lighting allows standard settings. Focus on color accuracy for merchandise ID.",
+                insight: "A healthy 'bell curve' histogram indicates a well-lit environment requiring minimal algorithmic boosting.",
+                chartData: [5, 10, 20, 40, 60, 80, 90, 80, 60, 40, 20, 10, 5, 2, 1, 0]
+            }
+        };
+
+        const techDetails = {
+            'wdr': {
+                title: "Wide Dynamic Range (WDR)",
+                desc: "WDR resolves contrast issues by capturing 2-3 frames at different exposure times and stitching them together. This prevents bright areas from being blown out and dark areas from being crushed.",
+                list: [
+                    "<b>Digital WDR (DWDR):</b> Software-based contrast adjustment. Cheap but less effective.",
+                    "<b>True WDR (120dB):</b> Hardware-based multi-exposure. The industry standard.",
+                    "<b>Pro WDR (140dB+):</b> For extreme contrast like tunnel exits."
+                ],
+                chartType: 'line',
+                labels: ['Dark', 'Shadow', 'Midtone', 'Highlight', 'Bright'],
+                datasets: [
+                    { label: 'Standard Sensor', data: [0, 20, 100, 255, 255], borderColor: '#6b7280', tension: 0.4 },
+                    { label: 'WDR Enabled', data: [10, 40, 120, 200, 240], borderColor: '#ff6b1a', tension: 0.4, borderWidth: 3 }
+                ]
+            },
+            'hlc': {
+                title: "High Light Compensation (HLC)",
+                desc: "HLC detects the brightest pixels (headlights, flashlights) and digitally masks them. This prevents the bright light from 'blooming' and obscuring surrounding details like license plates.",
+                list: [
+                    "<b>Primary Use:</b> License Plate Recognition (LPR) at night.",
+                    "<b>Trade-off:</b> The rest of the image may become darker.",
+                    "<b>Smart HLC:</b> Only activates when a threshold brightness is detected."
+                ],
+                chartType: 'bar',
+                labels: ['Background', 'Road', 'Car Body', 'Headlight', 'Plate'],
+                datasets: [
+                    { label: 'Standard', data: [20, 30, 40, 255, 255], backgroundColor: '#6b7280' },
+                    { label: 'HLC Enabled', data: [15, 25, 35, 100, 180], backgroundColor: '#ff6b1a' }
+                ]
+            },
+            'dnr': {
+                title: "3D Digital Noise Reduction (DNR)",
+                desc: "Low light forces gain amplification, which introduces noise. 3D DNR compares sequential frames to find static pixels vs moving noise, resulting in cleaner images and lower bandwidth.",
+                list: [
+                    "<b>Bandwidth Saver:</b> Noise looks like motion to compression. DNR reduces bitrate by up to 50%.",
+                    "<b>Risk:</b> Excessive 3D DNR can cause 'motion blur' or trailing.",
+                    "<b>Setting:</b> Moderate for moving scenes, high for static scenes."
+                ],
+                chartType: 'line',
+                labels: ['Frame 1', 'Frame 2', 'Frame 3', 'Frame 4', 'Frame 5'],
+                datasets: [
+                    { label: 'No DNR', data: [80, 85, 78, 82, 80], borderColor: '#ef4444', borderDash: [5, 5] },
+                    { label: '3D DNR', data: [80, 50, 30, 20, 15], borderColor: '#10b981', tension: 0.4 }
+                ]
+            },
+            'roi': {
+                title: "Smart Codec & ROI (Region of Interest)",
+                desc: "Smart Codecs analyze the scene to separate background (static walls) from foreground (people/cars). They compress background heavily while maintaining high quality on moving objects.",
+                list: [
+                    "<b>Dynamic GOP:</b> Increases time between I-frames when no motion detected.",
+                    "<b>Dynamic Bitrate:</b> Lowers bitrate drastically during idle times.",
+                    "<b>ROI:</b> Manual high-quality zones (e.g., over a door)."
+                ],
+                chartType: 'doughnut',
+                labels: ['Background Data', 'Moving Object Data'],
+                datasets: [
+                    { label: 'Storage Usage', data: [20, 80], backgroundColor: ['#6b7280', '#ff6b1a'] }
+                ]
+            }
+        };
+
+        // --- CHART INSTANCES ---
+        let histogramChartInstance = null;
+        let techChartInstance = null;
+
+        // --- INIT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            // Check for hash navigation
+            const hash = window.location.hash.replace('#', '');
+            if (hash && ['hero', 'dashboard', 'tech', 'manufacturers', 'calculator'].includes(hash)) {
+                navigate(hash);
+            }
+
+            calculateStorage();
+
+            const ctxTech = document.getElementById('techChart');
+            if (ctxTech) {
+                techChartInstance = new Chart(ctxTech.getContext('2d'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+                updateTechDetail('wdr');
+            }
+        });
+
+        // --- NAVIGATION LOGIC ---
+        function navigate(viewId) {
+            document.querySelectorAll('main > section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('nav-active', 'text-orange-glow');
+                el.classList.add('text-gray-400');
+            });
+            const navEl = document.getElementById(`nav-${viewId}`);
+            if (navEl) {
+                navEl.classList.add('nav-active', 'text-orange-glow');
+                navEl.classList.remove('text-gray-400');
+            }
+
+            // Initialize charts when becoming visible
+            if(viewId === 'dashboard') {
+                setTimeout(() => loadScenario('lobby'), 100);
+            }
+            if(viewId === 'tech' && techChartInstance) {
+                techChartInstance.resize();
+            }
+
+            window.location.hash = viewId;
+        }
+
+        // --- SCENARIO LOGIC ---
+        function loadScenario(key) {
+            const data = scenarios[key];
+
+            document.getElementById('scenario-badge').innerText = data.name;
+            document.getElementById('val-shutter').innerText = data.shutter;
+            document.getElementById('bar-shutter').style.width = data.shutterVal + '%';
+            document.getElementById('desc-shutter').innerText = data.desc.split('.')[0] + '.';
+
+            document.getElementById('val-gain').innerText = data.gain;
+            document.getElementById('bar-gain').style.width = data.gainVal + '%';
+
+            const wdrEl = document.getElementById('val-wdr');
+            wdrEl.className = `text-xs font-bold px-2 py-1 rounded mono ${data.wdrColor}`;
+            wdrEl.innerText = data.wdr;
+
+            document.getElementById('val-special').innerText = data.special;
+            document.getElementById('scenario-insight').innerText = data.insight;
+
+            document.querySelectorAll('[id^="btn-"]').forEach(b => {
+                b.classList.remove('tab-active');
+                b.classList.add('border-gray-700');
+            });
+            const activeBtn = document.getElementById(`btn-${key}`);
+            if (activeBtn) {
+                activeBtn.classList.add('tab-active');
+            }
+
+            updateHistogram(data.chartData);
+        }
+
+        function updateHistogram(dataPoints) {
+            const ctx = document.getElementById('histogramChart');
+            if (!ctx) return;
+
+            if (histogramChartInstance) {
+                histogramChartInstance.destroy();
+            }
+
+            histogramChartInstance = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['0', '16', '32', '48', '64', '80', '96', '112', '128', '144', '160', '176', '192', '208', '224', '255'],
+                    datasets: [{
+                        label: 'Pixel Density',
+                        data: dataPoints,
+                        backgroundColor: (context) => {
+                            const value = context.dataIndex / 15;
+                            return `rgba(255, ${107 + (value * 50)}, ${26 + (value * 100)}, 0.8)`;
+                        },
+                        borderRadius: 4,
+                        barPercentage: 1.0,
+                        categoryPercentage: 1.0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, color: '#374151' },
+                            ticks: { color: '#9ca3af' },
+                            title: { display: true, text: 'Dark <--------> Bright', color: '#9ca3af' }
+                        },
+                        y: { display: false }
+                    },
+                    animation: { duration: 800, easing: 'easeOutQuart' }
+                }
+            });
+        }
+
+        // --- TECH DETAIL LOGIC ---
+        function updateTechDetail(key) {
+            const data = techDetails[key];
+            document.getElementById('tech-title').innerText = data.title;
+            document.getElementById('tech-desc').innerHTML = data.desc;
+
+            const listContainer = document.getElementById('tech-list');
+            listContainer.innerHTML = '';
+            data.list.forEach(item => {
+                const li = document.createElement('li');
+                li.className = "flex items-start mb-2";
+                li.innerHTML = `<span class="mr-2 mt-1 text-orange-primary">▸</span> <span>${item}</span>`;
+                listContainer.appendChild(li);
+            });
+
+            if (techChartInstance) {
+                techChartInstance.destroy();
+            }
+            const ctx = document.getElementById('techChart').getContext('2d');
+            techChartInstance = new Chart(ctx, {
+                type: data.chartType,
+                data: {
+                    labels: data.labels,
+                    datasets: data.datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#9ca3af' }
+                        }
+                    },
+                    scales: data.chartType !== 'doughnut' ? {
+                        x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                    } : undefined
+                }
+            });
+        }
+
+        // --- CALCULATOR LOGIC ---
+        function calculateStorage() {
+            const cams = parseInt(document.getElementById('calc-cams').value) || 0;
+            const res = parseInt(document.getElementById('calc-res').value) || 2;
+            const fps = parseInt(document.getElementById('calc-fps').value) || 15;
+            const codec = parseFloat(document.getElementById('calc-codec').value) || 1;
+            const days = parseInt(document.getElementById('calc-days').value) || 30;
+
+            let baseBitrate = res * (fps / 15);
+            let finalBitrate = baseBitrate * codec;
+            let totalBandwidthMbps = finalBitrate * cams;
+
+            const mbPerSec = totalBandwidthMbps / 8;
+            const mbPerDay = mbPerSec * 86400;
+            const tbPerDay = mbPerDay / 1000000;
+            const totalTB = tbPerDay * days;
+
+            document.getElementById('calc-result').innerText = totalTB.toFixed(2) + " TB";
+            document.getElementById('calc-bandwidth').innerText = totalBandwidthMbps.toFixed(1) + " Mbps";
+            document.getElementById('calc-percam').innerText = finalBitrate.toFixed(1) + " Mbps";
+        }
+    </script>
+</body>
+</html>

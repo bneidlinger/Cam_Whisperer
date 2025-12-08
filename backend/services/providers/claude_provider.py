@@ -205,7 +205,7 @@ class ClaudeOptimizationProvider(OptimizationProvider):
                 gain_limit=e.get("gainLimit"),
                 wdr=e.get("wdr", "Off"),
                 blc=e.get("blc", "Off"),
-                hlc=e.get("hlc"),
+                hlc=e.get("hlc") or e.get("HLC"),  # Handle both cases
             )
 
         low_light = None
