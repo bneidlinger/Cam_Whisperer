@@ -97,13 +97,30 @@ class DiscoveryService:
             # Get encoder configs
             encoder_configs = await self.onvif_client.get_video_encoder_configs(camera)
 
+            # Get video sources (for imaging capabilities)
+            video_sources = []
+            try:
+                video_sources = await self.onvif_client.get_video_sources(camera)
+            except Exception as e:
+                logger.warning(f"Could not query video sources: {e}")
+
+            # Get media profiles
+            media_profiles = []
+            try:
+                media_profiles = await self.onvif_client.get_media_profiles(camera)
+            except Exception as e:
+                logger.warning(f"Could not query media profiles: {e}")
+
             # Build capabilities response
             capabilities = {
                 "device": device_info,
                 "video_encoders": encoder_configs,
+                "video_sources": video_sources,
+                "media_profiles": media_profiles,
                 "max_resolution": self._get_max_resolution(encoder_configs),
                 "supported_codecs": self._get_supported_codecs(encoder_configs),
                 "max_fps": self._get_max_fps(encoder_configs),
+                "has_imaging_service": device_info.get("capabilities", {}).get("imaging", False),
                 "queried_at": datetime.utcnow().isoformat() + "Z"
             }
 
@@ -148,10 +165,32 @@ class DiscoveryService:
             # Use first config (usually the main stream)
             main_config = encoder_configs[0]
 
-            # Get imaging settings (need video source token)
-            # For now, use a default or skip if we don't have it
-            # imaging_settings = await self.onvif_client.get_imaging_settings(camera, video_source_token)
+            # Get video source token for imaging settings
+            video_source_token = None
+            imaging_settings = None
 
+            try:
+                # First try to get from media profiles
+                media_profiles = await self.onvif_client.get_media_profiles(camera)
+                if media_profiles:
+                    video_source_token = media_profiles[0].get("video_source_token")
+
+                # Fallback to video sources directly
+                if not video_source_token:
+                    video_sources = await self.onvif_client.get_video_sources(camera)
+                    if video_sources:
+                        video_source_token = video_sources[0].get("token")
+
+                # Get imaging settings if we have a token
+                if video_source_token:
+                    imaging_settings = await self.onvif_client.get_imaging_settings(
+                        camera, video_source_token
+                    )
+                    logger.info(f"Successfully retrieved imaging settings for video source: {video_source_token}")
+            except Exception as e:
+                logger.warning(f"Could not retrieve imaging settings: {e}")
+
+            # Build current settings response
             current_settings = {
                 "stream": {
                     "resolution": f"{main_config['resolution']['width']}x{main_config['resolution']['height']}",
@@ -159,16 +198,10 @@ class DiscoveryService:
                     "fps": main_config['fps'],
                     "bitrateMbps": main_config['bitrate_limit'] / 1000.0,  # Convert Kbps to Mbps
                 },
-                "exposure": {
-                    # These would come from imaging settings
-                    "shutter": "Auto",  # Placeholder
-                    "iris": "Auto",
-                    "wdr": "Unknown"
-                },
-                "lowLight": {
-                    "irMode": "Auto",
-                    "noiseReduction": "Unknown"
-                },
+                "exposure": self._build_exposure_settings(imaging_settings),
+                "lowLight": self._build_low_light_settings(imaging_settings),
+                "image": self._build_image_settings(imaging_settings),
+                "video_source_token": video_source_token,  # Include for apply operations
                 "queried_at": datetime.utcnow().isoformat() + "Z"
             }
 
@@ -177,6 +210,56 @@ class DiscoveryService:
         except Exception as e:
             logger.error(f"Failed to query current settings: {e}")
             raise
+
+    def _build_exposure_settings(self, imaging_settings: Optional[Dict]) -> Dict:
+        """Build exposure settings from imaging data"""
+        if not imaging_settings:
+            return {
+                "mode": "Unknown",
+                "shutter": "Unknown",
+                "iris": "Unknown",
+                "wdr": "Unknown"
+            }
+
+        exposure = imaging_settings.get("exposure", {})
+        wdr = imaging_settings.get("wdr", {})
+
+        return {
+            "mode": exposure.get("mode", "Auto"),
+            "shutter": f"{exposure.get('min_exposure_time', 'Auto')}-{exposure.get('max_exposure_time', 'Auto')}" if exposure.get('min_exposure_time') else "Auto",
+            "iris": "Auto",  # ONVIF doesn't always expose this separately
+            "gainLimit": f"{exposure.get('max_gain', 'Auto')}" if exposure.get('max_gain') else "Auto",
+            "wdr": wdr.get("mode", "Unknown"),
+            "wdrLevel": wdr.get("level") if wdr.get("level") is not None else None
+        }
+
+    def _build_low_light_settings(self, imaging_settings: Optional[Dict]) -> Dict:
+        """Build low light settings from imaging data"""
+        if not imaging_settings:
+            return {
+                "irMode": "Unknown",
+                "noiseReduction": "Unknown"
+            }
+
+        # Note: IR mode is often controlled via PTZ or separate service
+        # ONVIF Imaging service typically doesn't expose IR directly
+        return {
+            "irMode": "Auto",  # Usually controlled elsewhere
+            "dayNightMode": "Auto",
+            "noiseReduction": "Unknown"  # Would need to check for DNR extension
+        }
+
+    def _build_image_settings(self, imaging_settings: Optional[Dict]) -> Optional[Dict]:
+        """Build image quality settings from imaging data"""
+        if not imaging_settings:
+            return None
+
+        return {
+            "brightness": imaging_settings.get("brightness"),
+            "contrast": imaging_settings.get("contrast"),
+            "saturation": imaging_settings.get("saturation"),
+            "sharpness": imaging_settings.get("sharpness")
+        }
 
 
     def _get_max_resolution(self, encoder_configs: List[Dict]) -> str:

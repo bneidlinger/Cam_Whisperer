@@ -344,6 +344,84 @@ class ONVIFClient:
             raise
 
 
+    async def get_video_sources(self, camera: ONVIFCamera) -> List[Dict]:
+        """
+        Get video sources from camera (required for imaging settings)
+
+        Args:
+            camera: ONVIFCamera instance
+
+        Returns:
+            List of video source dictionaries with tokens
+        """
+        logger.info("Querying video sources...")
+
+        try:
+            media = camera.create_media_service()
+
+            loop = asyncio.get_event_loop()
+            sources = await loop.run_in_executor(
+                self.executor,
+                media.GetVideoSources
+            )
+
+            result = []
+            for source in sources:
+                result.append({
+                    "token": source.token,
+                    "framerate": source.Framerate if hasattr(source, 'Framerate') else None,
+                    "resolution": {
+                        "width": source.Resolution.Width if hasattr(source, 'Resolution') else None,
+                        "height": source.Resolution.Height if hasattr(source, 'Resolution') else None
+                    } if hasattr(source, 'Resolution') else None
+                })
+
+            logger.info(f"Found {len(result)} video sources")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to get video sources: {e}")
+            raise
+
+
+    async def get_media_profiles(self, camera: ONVIFCamera) -> List[Dict]:
+        """
+        Get media profiles from camera (contains profile tokens for snapshots)
+
+        Args:
+            camera: ONVIFCamera instance
+
+        Returns:
+            List of media profile dictionaries
+        """
+        logger.info("Querying media profiles...")
+
+        try:
+            media = camera.create_media_service()
+
+            loop = asyncio.get_event_loop()
+            profiles = await loop.run_in_executor(
+                self.executor,
+                media.GetProfiles
+            )
+
+            result = []
+            for profile in profiles:
+                result.append({
+                    "name": profile.Name,
+                    "token": profile.token,
+                    "video_source_token": profile.VideoSourceConfiguration.SourceToken if hasattr(profile, 'VideoSourceConfiguration') and profile.VideoSourceConfiguration else None,
+                    "video_encoder_token": profile.VideoEncoderConfiguration.token if hasattr(profile, 'VideoEncoderConfiguration') and profile.VideoEncoderConfiguration else None
+                })
+
+            logger.info(f"Found {len(result)} media profiles")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to get media profiles: {e}")
+            raise
+
+
     async def get_video_encoder_configs(self, camera: ONVIFCamera) -> List[Dict]:
         """
         Get video encoder configurations from camera

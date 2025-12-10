@@ -135,12 +135,50 @@ class ApplyService:
                 job["steps"][-1]["status"] = "completed"
                 job["progress"] = 60
 
-            # Step 4: Apply imaging settings (exposure, WDR, etc.)
-            # Note: This requires video source token, which we'd need to query
-            # For now, we'll skip imaging settings or implement in future
+            # Step 4: Apply imaging settings (exposure, WDR, brightness, etc.)
             if "exposure" in settings or "lowLight" in settings or "image" in settings:
-                job["steps"].append({"name": "Apply imaging settings", "status": "skipped"})
-                job["steps"][-1]["message"] = "Imaging settings require video source token (not implemented yet)"
+                job["steps"].append({"name": "Apply imaging settings", "status": "in_progress"})
+
+                try:
+                    # Get video source token
+                    video_source_token = settings.get("video_source_token")
+
+                    if not video_source_token:
+                        # Try to get from media profiles
+                        media_profiles = await self.onvif_client.get_media_profiles(camera)
+                        if media_profiles:
+                            video_source_token = media_profiles[0].get("video_source_token")
+
+                    if not video_source_token:
+                        # Try to get from video sources directly
+                        video_sources = await self.onvif_client.get_video_sources(camera)
+                        if video_sources:
+                            video_source_token = video_sources[0].get("token")
+
+                    if video_source_token:
+                        # Translate and apply imaging settings
+                        imaging_settings = self._translate_imaging_settings(settings)
+
+                        if imaging_settings:
+                            await self.onvif_client.set_imaging_settings(
+                                camera,
+                                video_source_token,
+                                imaging_settings
+                            )
+                            job["steps"][-1]["status"] = "completed"
+                            job["steps"][-1]["message"] = f"Applied imaging settings to video source: {video_source_token}"
+                        else:
+                            job["steps"][-1]["status"] = "skipped"
+                            job["steps"][-1]["message"] = "No imaging settings to apply"
+                    else:
+                        job["steps"][-1]["status"] = "skipped"
+                        job["steps"][-1]["message"] = "Could not find video source token - imaging settings skipped"
+
+                except Exception as e:
+                    logger.warning(f"Failed to apply imaging settings: {e}")
+                    job["steps"][-1]["status"] = "warning"
+                    job["steps"][-1]["message"] = f"Imaging settings partially applied or failed: {str(e)}"
+
                 job["progress"] = 80
 
             # Step 5: Verify settings (if requested)
@@ -239,6 +277,41 @@ class ApplyService:
             onvif_settings["keyframe_interval"] = stream_settings["keyframeInterval"]
 
         return onvif_settings
+
+
+    def _translate_imaging_settings(self, settings: Dict) -> Dict:
+        """
+        Translate CamOpt imaging settings to ONVIF imaging format
+
+        Args:
+            settings: CamOpt format settings containing exposure, lowLight, image
+
+        Returns:
+            ONVIF-compatible imaging settings dictionary
+        """
+        onvif_imaging = {}
+
+        # Extract image settings (brightness, contrast, saturation, sharpness)
+        image_settings = settings.get("image", {})
+        if image_settings:
+            if image_settings.get("brightness") is not None:
+                onvif_imaging["brightness"] = image_settings["brightness"]
+            if image_settings.get("contrast") is not None:
+                onvif_imaging["contrast"] = image_settings["contrast"]
+            if image_settings.get("saturation") is not None:
+                onvif_imaging["saturation"] = image_settings["saturation"]
+            if image_settings.get("sharpness") is not None:
+                onvif_imaging["sharpness"] = image_settings["sharpness"]
+            # Handle alias
+            if image_settings.get("sharpening") is not None and "sharpness" not in onvif_imaging:
+                onvif_imaging["sharpness"] = image_settings["sharpening"]
+
+        # Note: Exposure and WDR settings require more complex handling
+        # as they involve nested structures in ONVIF. The set_imaging_settings
+        # method in onvif_client handles basic image quality settings.
+        # Full exposure control would need additional implementation.
+
+        return onvif_imaging
 
 
     def _verify_settings(self, expected: Dict, actual: Optional[Dict]) -> Dict:

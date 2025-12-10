@@ -9,7 +9,9 @@
       "Bash(wc:*)",
       "Bash(curl:*)",
       "Bash(backend/venv/Scripts/python.exe -m pytest tests/backend/test_optimization.py -v --tb=short)",
-      "Bash(./venv/Scripts/python.exe:*)"
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(backend\\venv\\Scripts\\python.exe -m pytest:*)",
+      "Bash(venv/Scripts/python.exe -m pytest ../tests/backend/test_optimization.py -v --tb=short)"
     ],
     "deny": [],
     "ask": []
