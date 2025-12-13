@@ -9,9 +9,12 @@ import logging
 import traceback
 
 from config import get_settings
+from database import init_db
 from services.optimization import get_optimization_service
 from services.discovery import DiscoveryService
 from services.apply import ApplyService, ApplyMethod
+from services.datasheet_service import get_datasheet_service
+from services.camera_service import get_camera_service
 
 # Configure logging
 logging.basicConfig(
@@ -65,11 +68,19 @@ async def startup_event():
     logger.info(f"Claude Model: {settings.claude_model}")
     logger.info(f"API Key configured: {'Yes' if settings.anthropic_api_key else 'No'}")
     logger.info(f"Fallback to heuristic: {settings.fallback_to_heuristic}")
+
+    # Initialize database
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+
     logger.info("=" * 60)
 
     if not settings.anthropic_api_key:
-        logger.warning("⚠️  No Anthropic API key configured! Will use heuristic fallback only.")
-        logger.warning("⚠️  Set ANTHROPIC_API_KEY in .env file to enable Claude Vision.")
+        logger.warning("No Anthropic API key configured! Will use heuristic fallback only.")
+        logger.warning("Set ANTHROPIC_API_KEY in .env file to enable Claude Vision.")
 
 # ---- Pydantic models ----
 
@@ -442,13 +453,20 @@ async def get_apply_status(job_id: str):
     Get status of an apply job.
 
     Args:
-        job_id: Apply job identifier
+        job_id: Apply job identifier (int ID or legacy string format)
 
     Returns:
         Job status (pending, in_progress, completed, failed)
     """
     apply_service = ApplyService()
-    job = apply_service.get_job_status(job_id)
+
+    # Try to parse as int (new format)
+    try:
+        int_job_id = int(job_id)
+        job = apply_service.get_job_status(int_job_id)
+    except ValueError:
+        # Legacy string format (e.g., "apply-camera1-1234567890")
+        job = apply_service.get_job_status_by_legacy_id(job_id)
 
     if not job:
         return {
@@ -616,3 +634,526 @@ async def get_wave_current_settings(
     except Exception as e:
         logger.error(f"Failed to query WAVE current settings: {e}", exc_info=True)
         raise
+
+
+# ---- Datasheet API endpoints ----
+
+class DatasheetSpecs(BaseModel):
+    """Manual datasheet specifications"""
+    sensor_size: Optional[str] = None
+    max_resolution: Optional[str] = None
+    min_illumination: Optional[str] = None
+    wdr_max_db: Optional[int] = None
+    supported_codecs: Optional[List[str]] = None
+    max_bitrate_mbps: Optional[float] = None
+    ir_range_meters: Optional[float] = None
+    onvif_profiles: Optional[List[str]] = None
+    raw_specs_text: Optional[str] = None
+
+
+class DatasheetUpload(BaseModel):
+    """Request body for manual datasheet upload"""
+    manufacturer: str
+    model: str
+    specs: DatasheetSpecs
+    pdf_url: Optional[str] = None
+
+
+@app.get("/api/datasheets/{manufacturer}/{model}")
+async def get_datasheet(manufacturer: str, model: str):
+    """
+    Get cached datasheet for a camera model.
+
+    Args:
+        manufacturer: Camera manufacturer name
+        model: Camera model name
+
+    Returns:
+        Cached datasheet specs or 404 if not found
+    """
+    logger.info(f"Datasheet query for {manufacturer} {model}")
+
+    datasheet_service = get_datasheet_service()
+    specs = datasheet_service.get_datasheet(manufacturer, model)
+
+    if not specs:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No datasheet found for {manufacturer} {model}"
+        )
+
+    return {
+        "manufacturer": manufacturer,
+        "model": model,
+        "specs": specs,
+        "cached": True
+    }
+
+
+@app.post("/api/datasheets/fetch")
+async def fetch_datasheet(manufacturer: str, model: str, force: bool = False):
+    """
+    Fetch and cache datasheet from web.
+
+    Args:
+        manufacturer: Camera manufacturer name
+        model: Camera model name
+        force: Force re-fetch even if cached
+
+    Returns:
+        Fetched datasheet specs or error
+    """
+    logger.info(f"Datasheet fetch requested for {manufacturer} {model} (force={force})")
+
+    datasheet_service = get_datasheet_service()
+
+    try:
+        specs = await datasheet_service.fetch_and_cache(manufacturer, model, force=force)
+
+        if specs:
+            return {
+                "manufacturer": manufacturer,
+                "model": model,
+                "specs": specs,
+                "fetched": True
+            }
+        else:
+            return {
+                "manufacturer": manufacturer,
+                "model": model,
+                "specs": None,
+                "fetched": False,
+                "error": "Could not find or parse datasheet"
+            }
+
+    except Exception as e:
+        logger.error(f"Datasheet fetch failed: {e}", exc_info=True)
+        return {
+            "manufacturer": manufacturer,
+            "model": model,
+            "specs": None,
+            "fetched": False,
+            "error": str(e)
+        }
+
+
+@app.post("/api/datasheets/upload")
+async def upload_datasheet(data: DatasheetUpload):
+    """
+    Manually upload datasheet specifications.
+
+    Args:
+        data: Datasheet upload request with manufacturer, model, and specs
+
+    Returns:
+        Saved datasheet specs
+    """
+    logger.info(f"Manual datasheet upload for {data.manufacturer} {data.model}")
+
+    datasheet_service = get_datasheet_service()
+
+    # Convert Pydantic model to dict
+    specs_dict = data.specs.model_dump(exclude_none=True)
+
+    specs = datasheet_service.save_manual_datasheet(
+        manufacturer=data.manufacturer,
+        model=data.model,
+        specs=specs_dict,
+        pdf_url=data.pdf_url
+    )
+
+    return {
+        "manufacturer": data.manufacturer,
+        "model": data.model,
+        "specs": specs,
+        "source": "manual_upload"
+    }
+
+
+@app.delete("/api/datasheets/{manufacturer}/{model}")
+async def delete_datasheet(manufacturer: str, model: str):
+    """
+    Delete cached datasheet.
+
+    Args:
+        manufacturer: Camera manufacturer name
+        model: Camera model name
+
+    Returns:
+        Deletion status
+    """
+    logger.info(f"Datasheet delete requested for {manufacturer} {model}")
+
+    datasheet_service = get_datasheet_service()
+    deleted = datasheet_service.delete_datasheet(manufacturer, model)
+
+    if deleted:
+        return {
+            "manufacturer": manufacturer,
+            "model": model,
+            "deleted": True
+        }
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No datasheet found for {manufacturer} {model}"
+        )
+
+
+@app.get("/api/datasheets")
+async def list_datasheets(manufacturer: Optional[str] = None):
+    """
+    List all cached datasheets.
+
+    Args:
+        manufacturer: Optional filter by manufacturer
+
+    Returns:
+        List of cached datasheets
+    """
+    logger.info(f"Listing datasheets (manufacturer filter: {manufacturer})")
+
+    datasheet_service = get_datasheet_service()
+    datasheets = datasheet_service.list_cached_datasheets(manufacturer=manufacturer)
+
+    return {
+        "datasheets": datasheets,
+        "count": len(datasheets)
+    }
+
+
+# ---- Camera Management Endpoints ----
+
+class CameraRegisterRequest(BaseModel):
+    """Request body for camera registration"""
+    ip: str
+    port: int = 80
+    vendor: Optional[str] = None
+    model: Optional[str] = None
+    location: Optional[str] = None
+    scene_type: Optional[str] = None
+    purpose: Optional[str] = None
+    onvif_username: Optional[str] = None
+    onvif_password: Optional[str] = None
+    discovery_method: Optional[str] = "manual"
+    vms_system: Optional[str] = None
+    vms_camera_id: Optional[str] = None
+    camera_id: Optional[str] = None  # Optional custom ID
+
+
+class CameraUpdateRequest(BaseModel):
+    """Request body for camera update"""
+    location: Optional[str] = None
+    scene_type: Optional[str] = None
+    purpose: Optional[str] = None
+    vendor: Optional[str] = None
+    model: Optional[str] = None
+    port: Optional[int] = None
+    onvif_username: Optional[str] = None
+    onvif_password_encrypted: Optional[str] = None
+    vms_system: Optional[str] = None
+    vms_camera_id: Optional[str] = None
+
+
+@app.get("/api/cameras")
+async def list_cameras(
+    scene_type: Optional[str] = None,
+    purpose: Optional[str] = None,
+    vendor: Optional[str] = None,
+    discovery_method: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """
+    List registered cameras with optional filters.
+
+    Args:
+        scene_type: Filter by scene type
+        purpose: Filter by purpose
+        vendor: Filter by vendor
+        discovery_method: Filter by discovery method
+        limit: Max results (default: 100)
+        offset: Pagination offset
+
+    Returns:
+        List of registered cameras
+    """
+    logger.info(f"Listing cameras (filters: scene_type={scene_type}, purpose={purpose})")
+
+    camera_service = get_camera_service()
+    cameras = camera_service.list_cameras(
+        scene_type=scene_type,
+        purpose=purpose,
+        vendor=vendor,
+        discovery_method=discovery_method,
+        limit=limit,
+        offset=offset,
+    )
+
+    return {
+        "cameras": [c.to_dict() for c in cameras],
+        "count": len(cameras),
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@app.post("/api/cameras")
+async def register_camera(req: CameraRegisterRequest):
+    """
+    Register a new camera or update existing by IP.
+
+    Args:
+        req: Camera registration details
+
+    Returns:
+        Registered camera data
+    """
+    logger.info(f"Registering camera at {req.ip}:{req.port}")
+
+    camera_service = get_camera_service()
+
+    try:
+        camera = camera_service.register_camera(
+            ip=req.ip,
+            port=req.port,
+            vendor=req.vendor,
+            model=req.model,
+            location=req.location,
+            scene_type=req.scene_type,
+            purpose=req.purpose,
+            onvif_username=req.onvif_username,
+            onvif_password=req.onvif_password,
+            discovery_method=req.discovery_method,
+            vms_system=req.vms_system,
+            vms_camera_id=req.vms_camera_id,
+            camera_id=req.camera_id,
+        )
+
+        return {
+            "camera": camera.to_dict(),
+            "registered": True,
+        }
+
+    except Exception as e:
+        logger.error(f"Camera registration failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/cameras/{camera_id}")
+async def get_camera(camera_id: str):
+    """
+    Get camera by ID.
+
+    Args:
+        camera_id: Camera identifier
+
+    Returns:
+        Camera data or 404 if not found
+    """
+    logger.info(f"Getting camera {camera_id}")
+
+    camera_service = get_camera_service()
+    camera = camera_service.get_camera(camera_id)
+
+    if not camera:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Camera '{camera_id}' not found"
+        )
+
+    return {
+        "camera": camera.to_dict(),
+    }
+
+
+@app.put("/api/cameras/{camera_id}")
+async def update_camera(camera_id: str, req: CameraUpdateRequest):
+    """
+    Update camera metadata.
+
+    Args:
+        camera_id: Camera identifier
+        req: Fields to update
+
+    Returns:
+        Updated camera data or 404 if not found
+    """
+    logger.info(f"Updating camera {camera_id}")
+
+    camera_service = get_camera_service()
+
+    # Convert request to dict, excluding None values
+    updates = req.model_dump(exclude_none=True)
+
+    camera = camera_service.update_camera(camera_id, **updates)
+
+    if not camera:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Camera '{camera_id}' not found"
+        )
+
+    return {
+        "camera": camera.to_dict(),
+        "updated": True,
+    }
+
+
+@app.delete("/api/cameras/{camera_id}")
+async def delete_camera(camera_id: str, hard: bool = False):
+    """
+    Delete camera (soft delete by default).
+
+    Args:
+        camera_id: Camera identifier
+        hard: If True, permanently delete
+
+    Returns:
+        Deletion status
+    """
+    logger.info(f"Deleting camera {camera_id} (hard={hard})")
+
+    camera_service = get_camera_service()
+    deleted = camera_service.delete_camera(camera_id, hard=hard)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Camera '{camera_id}' not found"
+        )
+
+    return {
+        "camera_id": camera_id,
+        "deleted": True,
+        "hard_delete": hard,
+    }
+
+
+# ---- Optimization History Endpoints ----
+
+@app.get("/api/optimizations")
+async def list_optimizations(
+    camera_id: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    List optimization history.
+
+    Args:
+        camera_id: Optional filter by camera ID
+        limit: Max results (default: 50)
+        offset: Pagination offset
+
+    Returns:
+        List of optimization records
+    """
+    logger.info(f"Listing optimizations (camera_id={camera_id})")
+
+    optimization_service = get_optimization_service()
+    optimizations = optimization_service.get_optimization_history(
+        camera_id=camera_id,
+        limit=limit,
+        offset=offset,
+    )
+
+    return {
+        "optimizations": optimizations,
+        "count": len(optimizations),
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@app.get("/api/optimizations/{optimization_id}")
+async def get_optimization(optimization_id: int):
+    """
+    Get single optimization by ID.
+
+    Args:
+        optimization_id: Optimization ID
+
+    Returns:
+        Optimization record or 404 if not found
+    """
+    logger.info(f"Getting optimization {optimization_id}")
+
+    optimization_service = get_optimization_service()
+    optimization = optimization_service.get_optimization(optimization_id)
+
+    if not optimization:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Optimization '{optimization_id}' not found"
+        )
+
+    return {
+        "optimization": optimization,
+    }
+
+
+@app.get("/api/cameras/{camera_id}/optimizations")
+async def get_camera_optimizations(camera_id: str, limit: int = 20):
+    """
+    Get optimization history for a specific camera.
+
+    Args:
+        camera_id: Camera identifier
+        limit: Max results (default: 20)
+
+    Returns:
+        List of optimizations for the camera
+    """
+    logger.info(f"Getting optimizations for camera {camera_id}")
+
+    optimization_service = get_optimization_service()
+    optimizations = optimization_service.get_optimization_history(
+        camera_id=camera_id,
+        limit=limit,
+    )
+
+    return {
+        "camera_id": camera_id,
+        "optimizations": optimizations,
+        "count": len(optimizations),
+    }
+
+
+# ---- Apply Job Endpoints ----
+
+@app.get("/api/apply/jobs")
+async def list_apply_jobs(
+    camera_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    List apply jobs with optional filters.
+
+    Args:
+        camera_id: Filter by camera ID
+        status: Filter by status (pending, applying, success, failed, partial)
+        limit: Max results (default: 50)
+        offset: Pagination offset
+
+    Returns:
+        List of apply job records
+    """
+    logger.info(f"Listing apply jobs (camera_id={camera_id}, status={status})")
+
+    apply_service = ApplyService()
+    jobs = apply_service.list_jobs(
+        camera_id=camera_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+
+    return {
+        "jobs": jobs,
+        "count": len(jobs),
+        "offset": offset,
+        "limit": limit,
+    }

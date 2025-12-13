@@ -131,7 +131,7 @@ class ClaudeOptimizationProvider(OptimizationProvider):
                 "targetRetentionDays": context.target_retention_days,
             }
 
-            # Call Claude API
+            # Call Claude API with datasheet specs if available
             recommended_dict, confidence, explanation = (
                 self.client.optimize_camera_settings(
                     camera_context=camera_dict,
@@ -139,6 +139,7 @@ class ClaudeOptimizationProvider(OptimizationProvider):
                     capabilities=capabilities_dict,
                     constraints=constraints,
                     sample_frame=context.sample_frame,
+                    datasheet_specs=context.datasheet_specs,
                 )
             )
 

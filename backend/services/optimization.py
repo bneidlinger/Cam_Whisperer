@@ -6,9 +6,10 @@ Orchestrates optimization pipeline using provider abstraction layer.
 Supports AI-powered and heuristic camera configuration optimization.
 """
 
+import hashlib
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from uuid import uuid4
 
 from models import (
@@ -21,6 +22,8 @@ from models import (
     CameraPurpose,
 )
 from models.pipeline import PipelineContext
+from models.orm import Optimization as OptimizationORM
+from database import get_db_session
 from services.providers import (
     get_provider,
     get_available_providers,
@@ -47,6 +50,7 @@ class OptimizationService:
     def __init__(self):
         """Initialize optimization service"""
         self._fallback_enabled = settings.fallback_to_heuristic
+        self._persist_results = True  # Enable database persistence
 
     async def optimize(
         self,
@@ -155,8 +159,13 @@ class OptimizationService:
                 f"Time: {result.processing_time_seconds:.3f}s"
             )
 
+            # Persist to database
+            optimization_id = None
+            if self._persist_results:
+                optimization_id = self._persist_optimization(camera_ctx, opt_context, result)
+
             # Convert to API response format
-            return self._to_response(result, pipeline)
+            return self._to_response(result, pipeline, optimization_id)
 
         except Exception as e:
             logger.error(f"[{request_id}] Optimization failed: {e}", exc_info=True)
@@ -273,6 +282,7 @@ class OptimizationService:
         self,
         result: OptimizationResult,
         pipeline: PipelineContext,
+        optimization_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Convert OptimizationResult to API response dict"""
         response = {
@@ -285,11 +295,140 @@ class OptimizationService:
             "generatedAt": result.generated_at.isoformat() + "Z",
         }
 
+        # Include optimization_id if persisted
+        if optimization_id:
+            response["optimizationId"] = optimization_id
+
         # Add pipeline metadata if there were errors
         if pipeline.errors:
             response["pipelineErrors"] = [e.to_dict() for e in pipeline.errors]
 
         return response
+
+    def _persist_optimization(
+        self,
+        camera: CameraContext,
+        context: OptimizationContext,
+        result: OptimizationResult,
+    ) -> Optional[int]:
+        """
+        Persist optimization result to database.
+
+        Args:
+            camera: Camera context
+            context: Optimization context
+            result: Optimization result
+
+        Returns:
+            Optimization ID if persisted, None otherwise
+        """
+        try:
+            # Build request data for storage
+            request_data = {
+                "camera_id": camera.id,
+                "ip": camera.ip,
+                "vendor": camera.vendor,
+                "model": camera.model,
+                "scene_type": camera.scene_type.value if camera.scene_type else None,
+                "purpose": camera.purpose.value if camera.purpose else None,
+                "location": camera.location,
+                "bandwidth_limit_mbps": context.bandwidth_limit_mbps,
+                "target_retention_days": context.target_retention_days,
+                "lighting_condition": context.lighting_condition,
+                "motion_level": context.motion_level,
+            }
+
+            # Calculate sample frame hash if present
+            sample_frame_hash = None
+            if context.sample_frame:
+                # Hash first 1000 chars of base64 to detect duplicates
+                frame_preview = context.sample_frame[:1000]
+                sample_frame_hash = hashlib.sha256(frame_preview.encode()).hexdigest()[:16]
+
+            # Convert recommended settings to dict
+            recommended_dict = result.recommended_settings.to_dict()
+
+            # Calculate processing time in ms
+            processing_time_ms = int(result.processing_time_seconds * 1000) if result.processing_time_seconds else None
+
+            with get_db_session() as session:
+                optimization = OptimizationORM(
+                    camera_id=camera.id,
+                    request_data=request_data,
+                    recommended_settings=recommended_dict,
+                    confidence=result.confidence,
+                    explanation=result.explanation,
+                    warnings=result.warnings,
+                    ai_provider=result.provider,
+                    processing_time_ms=processing_time_ms,
+                    sample_frame_hash=sample_frame_hash,
+                )
+                session.add(optimization)
+                session.flush()
+                opt_id = optimization.id
+                logger.info(f"Persisted optimization {opt_id} for camera {camera.id}")
+                return opt_id
+
+        except Exception as e:
+            logger.warning(f"Failed to persist optimization: {e}")
+            return None
+
+    def get_optimization_history(
+        self,
+        camera_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get optimization history, optionally filtered by camera.
+
+        Args:
+            camera_id: Filter by camera ID
+            limit: Max results
+            offset: Pagination offset
+
+        Returns:
+            List of optimization records as dicts
+        """
+        try:
+            with get_db_session() as session:
+                query = session.query(OptimizationORM)
+
+                if camera_id:
+                    query = query.filter(OptimizationORM.camera_id == camera_id)
+
+                query = query.order_by(OptimizationORM.created_at.desc())
+                query = query.offset(offset).limit(limit)
+
+                optimizations = query.all()
+                return [opt.to_dict() for opt in optimizations]
+
+        except Exception as e:
+            logger.error(f"Failed to get optimization history: {e}")
+            return []
+
+    def get_optimization(self, optimization_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get single optimization by ID.
+
+        Args:
+            optimization_id: Optimization ID
+
+        Returns:
+            Optimization dict or None if not found
+        """
+        try:
+            with get_db_session() as session:
+                optimization = session.query(OptimizationORM).filter(
+                    OptimizationORM.id == optimization_id
+                ).first()
+                if optimization:
+                    return optimization.to_dict()
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to get optimization {optimization_id}: {e}")
+            return None
 
 
 # Global service instance

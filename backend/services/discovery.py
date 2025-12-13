@@ -5,6 +5,8 @@ Handles camera discovery via:
 - ONVIF WS-Discovery
 - Hanwha WAVE VMS API
 - Manual registration
+
+Also triggers background datasheet fetching for discovered cameras.
 """
 
 import logging
@@ -15,6 +17,33 @@ from integrations.onvif_client import ONVIFClient
 from integrations.hanwha_wave_client import HanwhaWAVEClient
 
 logger = logging.getLogger(__name__)
+
+# Lazy imports to avoid circular dependencies
+_datasheet_service = None
+_camera_service = None
+
+def _get_datasheet_service():
+    """Lazy getter for datasheet service."""
+    global _datasheet_service
+    if _datasheet_service is None:
+        try:
+            from services.datasheet_service import get_datasheet_service
+            _datasheet_service = get_datasheet_service()
+        except ImportError as e:
+            logger.warning(f"Datasheet service not available: {e}")
+    return _datasheet_service
+
+
+def _get_camera_service():
+    """Lazy getter for camera service."""
+    global _camera_service
+    if _camera_service is None:
+        try:
+            from services.camera_service import get_camera_service
+            _camera_service = get_camera_service()
+        except ImportError as e:
+            logger.warning(f"Camera service not available: {e}")
+    return _camera_service
 
 
 class DiscoveryService:
@@ -57,13 +86,90 @@ class DiscoveryService:
             # Enrich with additional metadata
             for camera in cameras:
                 camera["discovery_method"] = "onvif"
-                camera["registered"] = False  # Not yet added to DB
+                camera["registered"] = False  # Will be updated by auto-register
+
+            # Trigger background datasheet fetch for discovered cameras
+            self._trigger_datasheet_fetch(cameras)
+
+            # Auto-register discovered cameras in database
+            self._auto_register_cameras(cameras, discovery_method="onvif")
 
             return cameras
 
         except Exception as e:
             logger.error(f"ONVIF discovery failed: {e}")
             return []
+
+    def _trigger_datasheet_fetch(self, cameras: List[Dict]) -> None:
+        """
+        Trigger background datasheet fetch for discovered cameras.
+        Non-blocking - returns immediately.
+        """
+        datasheet_service = _get_datasheet_service()
+        if not datasheet_service:
+            return
+
+        for camera in cameras:
+            manufacturer = camera.get("vendor") or camera.get("manufacturer")
+            model = camera.get("model")
+
+            if manufacturer and model:
+                try:
+                    datasheet_service.start_background_fetch(manufacturer, model)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to start datasheet fetch for {manufacturer} {model}: {e}"
+                    )
+
+    def _auto_register_cameras(
+        self,
+        cameras: List[Dict],
+        discovery_method: str,
+        vms_system: Optional[str] = None,
+    ) -> None:
+        """
+        Auto-register discovered cameras in the database.
+
+        Creates or updates camera records for each discovered camera.
+        Non-blocking - failures are logged but don't stop discovery.
+
+        Args:
+            cameras: List of discovered camera dicts
+            discovery_method: How cameras were discovered ('onvif', 'wave')
+            vms_system: VMS system name if applicable
+        """
+        camera_service = _get_camera_service()
+        if not camera_service:
+            logger.warning("Camera service not available - skipping auto-registration")
+            return
+
+        registered_count = 0
+        for camera in cameras:
+            try:
+                ip = camera.get("ip")
+                if not ip:
+                    continue
+
+                # Register or update camera
+                camera_service.register_camera(
+                    ip=ip,
+                    port=camera.get("port", 80),
+                    vendor=camera.get("vendor") or camera.get("manufacturer"),
+                    model=camera.get("model"),
+                    location=camera.get("name"),  # Use camera name as initial location
+                    discovery_method=discovery_method,
+                    vms_system=vms_system,
+                    vms_camera_id=camera.get("id") if vms_system else None,
+                )
+                camera["registered"] = True
+                registered_count += 1
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to auto-register camera {camera.get('ip')}: {e}"
+                )
+
+        logger.info(f"Auto-registered {registered_count}/{len(cameras)} discovered cameras")
 
 
     async def get_camera_capabilities(
@@ -123,6 +229,12 @@ class DiscoveryService:
                 "has_imaging_service": device_info.get("capabilities", {}).get("imaging", False),
                 "queried_at": datetime.utcnow().isoformat() + "Z"
             }
+
+            # Trigger background datasheet fetch
+            manufacturer = device_info.get("manufacturer")
+            model = device_info.get("model")
+            if manufacturer and model:
+                self._trigger_datasheet_fetch([{"vendor": manufacturer, "model": model}])
 
             return capabilities
 
@@ -366,10 +478,20 @@ class DiscoveryService:
             # Enrich with additional metadata
             for camera in cameras:
                 camera["discovery_method"] = "wave"
-                camera["registered"] = False  # Not yet added to DB
+                camera["registered"] = False  # Will be updated by auto-register
                 camera["wave_server"] = server_ip
 
             wave_client.close()
+
+            # Trigger background datasheet fetch for discovered cameras
+            self._trigger_datasheet_fetch(cameras)
+
+            # Auto-register discovered cameras in database
+            self._auto_register_cameras(
+                cameras,
+                discovery_method="wave",
+                vms_system="hanwha-wave",
+            )
 
             logger.info(f"Discovered {len(cameras)} cameras from WAVE VMS")
             return cameras

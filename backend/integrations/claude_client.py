@@ -33,6 +33,7 @@ class ClaudeVisionClient:
         capabilities: Dict[str, Any],
         constraints: Dict[str, Any],
         sample_frame: Optional[str] = None,
+        datasheet_specs: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Dict[str, Any], float, str]:
         """
         Generate optimal camera settings using Claude Vision
@@ -43,6 +44,7 @@ class ClaudeVisionClient:
             capabilities: Hardware capabilities
             constraints: Bandwidth/retention constraints
             sample_frame: Base64-encoded image (optional)
+            datasheet_specs: Camera datasheet specifications (optional)
 
         Returns:
             Tuple of (recommended_settings, confidence, explanation)
@@ -50,7 +52,7 @@ class ClaudeVisionClient:
         try:
             # Build the prompt
             prompt = self._build_optimization_prompt(
-                camera_context, current_settings, capabilities, constraints
+                camera_context, current_settings, capabilities, constraints, datasheet_specs
             )
 
             # Build message content
@@ -131,6 +133,7 @@ class ClaudeVisionClient:
         current_settings: Dict[str, Any],
         capabilities: Dict[str, Any],
         constraints: Dict[str, Any],
+        datasheet_specs: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build the optimization prompt for Claude"""
 
@@ -140,6 +143,19 @@ class ClaudeVisionClient:
         bandwidth_limit = constraints.get("bandwidthLimitMbps", "unlimited")
         retention_days = constraints.get("targetRetentionDays", "unspecified")
 
+        # Build datasheet section if specs are available
+        datasheet_section = ""
+        if datasheet_specs:
+            # Format datasheet specs for the prompt
+            specs_text = json.dumps(datasheet_specs, indent=2)
+            datasheet_section = f"""
+
+MANUFACTURER DATASHEET SPECIFICATIONS:
+The following specifications are from the official camera datasheet. Use these to inform your recommendations,
+especially for maximum supported values, sensor capabilities, and manufacturer-recommended settings.
+{specs_text}
+"""
+
         prompt = f"""You are an expert surveillance camera optimization engineer with 20+ years of field experience in video management systems, camera configuration, and evidence-quality video capture.
 
 CAMERA CONTEXT:
@@ -147,7 +163,8 @@ CAMERA CONTEXT:
 - Scene Type: {scene_type}
 - Primary Purpose: {purpose}
 - Camera Model: {camera_context.get('model', 'unknown')}
-
+- Manufacturer: {camera_context.get('manufacturer', 'unknown')}
+{datasheet_section}
 CURRENT SETTINGS:
 {json.dumps(current_settings, indent=2)}
 

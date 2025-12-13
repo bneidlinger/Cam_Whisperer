@@ -8,13 +8,15 @@ Handles applying optimized settings to cameras via:
 """
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 from datetime import datetime
 import asyncio
 from enum import Enum
 
 from integrations.onvif_client import ONVIFClient
 from integrations.hanwha_wave_client import HanwhaWAVEClient
+from database import get_db_session
+from models.orm import AppliedConfig
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,79 @@ class ApplyService:
 
     def __init__(self):
         self.onvif_client = ONVIFClient()
-        self.active_jobs = {}  # In-memory job tracking (should use DB in production)
+        # Job tracking now uses database (AppliedConfig table)
+        # In-memory cache for quick lookups during active operations
+        self._job_cache: Dict[int, Dict] = {}
+
+    def _create_job(
+        self,
+        camera_id: str,
+        settings: Dict,
+        apply_method: str,
+        optimization_id: Optional[int] = None,
+    ) -> int:
+        """
+        Create a new apply job in the database.
+
+        Args:
+            camera_id: Camera identifier
+            settings: Settings being applied
+            apply_method: Method of application (onvif, wave, etc.)
+            optimization_id: Optional optimization ID this job relates to
+
+        Returns:
+            Job ID (database primary key)
+        """
+        try:
+            with get_db_session() as session:
+                job = AppliedConfig(
+                    camera_id=camera_id,
+                    optimization_id=optimization_id,
+                    settings=settings,
+                    apply_method=apply_method,
+                    status="pending",
+                )
+                session.add(job)
+                session.flush()
+                job_id = job.id
+                logger.info(f"Created apply job {job_id} for camera {camera_id}")
+                return job_id
+        except Exception as e:
+            logger.error(f"Failed to create apply job: {e}")
+            raise
+
+    def _update_job_status(
+        self,
+        job_id: int,
+        status: str,
+        error_message: Optional[str] = None,
+        verification_result: Optional[Dict] = None,
+    ) -> None:
+        """
+        Update job status in database.
+
+        Args:
+            job_id: Job ID
+            status: New status (pending, applying, success, failed, partial)
+            error_message: Optional error message if failed
+            verification_result: Optional verification results
+        """
+        try:
+            with get_db_session() as session:
+                job = session.query(AppliedConfig).filter(AppliedConfig.id == job_id).first()
+                if job:
+                    job.status = status
+                    if error_message:
+                        job.error_message = error_message
+                    if verification_result:
+                        job.verification_result = verification_result
+                    if status == "applying":
+                        job.applied_at = datetime.utcnow()
+                    if status in ("success", "failed", "partial"):
+                        job.completed_at = datetime.utcnow()
+                    logger.debug(f"Updated job {job_id} status to {status}")
+        except Exception as e:
+            logger.error(f"Failed to update job {job_id}: {e}")
 
 
     async def apply_settings_onvif(
@@ -60,7 +134,8 @@ class ApplyService:
         username: str,
         password: str,
         settings: Dict,
-        verify: bool = True
+        verify: bool = True,
+        optimization_id: Optional[int] = None,
     ) -> Dict:
         """
         Apply settings to camera via ONVIF
@@ -73,17 +148,28 @@ class ApplyService:
             password: Camera password
             settings: Settings to apply (CamOpt format)
             verify: Whether to verify settings after apply
+            optimization_id: Optional optimization ID this job relates to
 
         Returns:
             Apply result dictionary
         """
-        job_id = f"apply-{camera_id}-{int(datetime.utcnow().timestamp())}"
+        # Create job in database
+        job_id = self._create_job(
+            camera_id=camera_id,
+            settings=settings,
+            apply_method="onvif",
+            optimization_id=optimization_id,
+        )
 
         logger.info(f"Starting settings apply job {job_id} for camera {camera_id} at {ip}:{port}")
 
-        # Create job tracking
+        # Update status to applying
+        self._update_job_status(job_id, "applying")
+
+        # Create in-memory job tracking for step details
         job = {
-            "job_id": job_id,
+            "id": job_id,
+            "job_id": job_id,  # For backward compatibility
             "camera_id": camera_id,
             "status": ApplyStatus.IN_PROGRESS,
             "progress": 0,
@@ -93,7 +179,7 @@ class ApplyService:
             "error": None
         }
 
-        self.active_jobs[job_id] = job
+        self._job_cache[job_id] = job
 
         try:
             # Step 1: Connect to camera
@@ -206,6 +292,14 @@ class ApplyService:
                 "verification_status": "success" if verify else "skipped"
             }
 
+            # Update database
+            verification_result = job.get("steps", [{}])[-1].get("verification") if verify else None
+            self._update_job_status(job_id, "success", verification_result=verification_result)
+
+            # Clean up cache
+            if job_id in self._job_cache:
+                del self._job_cache[job_id]
+
             logger.info(f"Apply job {job_id} completed successfully")
 
             return job
@@ -226,20 +320,104 @@ class ApplyService:
             if job["steps"]:
                 job["steps"][-1]["status"] = "failed"
 
+            # Update database
+            self._update_job_status(job_id, "failed", error_message=str(e))
+
+            # Clean up cache
+            if job_id in self._job_cache:
+                del self._job_cache[job_id]
+
             return job
 
 
-    def get_job_status(self, job_id: str) -> Optional[Dict]:
+    def get_job_status(self, job_id: int) -> Optional[Dict]:
         """
-        Get status of an apply job
+        Get status of an apply job from database.
 
         Args:
-            job_id: Job identifier
+            job_id: Job ID (database primary key)
 
         Returns:
             Job status dictionary or None if not found
         """
-        return self.active_jobs.get(job_id)
+        # Check in-memory cache first for active jobs
+        if job_id in self._job_cache:
+            return self._job_cache[job_id]
+
+        # Query from database
+        try:
+            with get_db_session() as session:
+                job = session.query(AppliedConfig).filter(AppliedConfig.id == job_id).first()
+                if job:
+                    return job.to_dict()
+                return None
+        except Exception as e:
+            logger.error(f"Failed to get job status for {job_id}: {e}")
+            return None
+
+    def get_job_status_by_legacy_id(self, legacy_job_id: str) -> Optional[Dict]:
+        """
+        Get job status by legacy string job ID format.
+
+        Args:
+            legacy_job_id: Legacy job ID string (e.g., "apply-camera1-1234567890")
+
+        Returns:
+            Job status dictionary or None if not found
+        """
+        # For backward compatibility with old job ID format
+        # Try to extract camera_id and find recent job for that camera
+        try:
+            parts = legacy_job_id.split("-")
+            if len(parts) >= 2 and parts[0] == "apply":
+                camera_id = parts[1]
+                with get_db_session() as session:
+                    job = session.query(AppliedConfig).filter(
+                        AppliedConfig.camera_id == camera_id
+                    ).order_by(AppliedConfig.created_at.desc()).first()
+                    if job:
+                        return job.to_dict()
+        except Exception as e:
+            logger.warning(f"Failed to lookup legacy job {legacy_job_id}: {e}")
+        return None
+
+    def list_jobs(
+        self,
+        camera_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """
+        List apply jobs with optional filters.
+
+        Args:
+            camera_id: Filter by camera ID
+            status: Filter by status
+            limit: Max results
+            offset: Pagination offset
+
+        Returns:
+            List of job records as dicts
+        """
+        try:
+            with get_db_session() as session:
+                query = session.query(AppliedConfig)
+
+                if camera_id:
+                    query = query.filter(AppliedConfig.camera_id == camera_id)
+                if status:
+                    query = query.filter(AppliedConfig.status == status)
+
+                query = query.order_by(AppliedConfig.created_at.desc())
+                query = query.offset(offset).limit(limit)
+
+                jobs = query.all()
+                return [job.to_dict() for job in jobs]
+
+        except Exception as e:
+            logger.error(f"Failed to list jobs: {e}")
+            return []
 
 
     def _translate_stream_settings(self, stream_settings: Dict) -> Dict:
@@ -468,7 +646,8 @@ class ApplyService:
         port: int,
         username: str,
         password: str,
-        verify: bool
+        verify: bool,
+        optimization_id: Optional[int] = None,
     ) -> Dict:
         """
         Apply settings via Hanwha WAVE VMS
@@ -482,17 +661,28 @@ class ApplyService:
             username: WAVE username
             password: WAVE password
             verify: Whether to verify after apply
+            optimization_id: Optional optimization ID this job relates to
 
         Returns:
             Apply result
         """
-        job_id = f"apply-wave-{camera_id}-{int(datetime.utcnow().timestamp())}"
+        # Create job in database
+        job_id = self._create_job(
+            camera_id=camera_id,
+            settings=settings,
+            apply_method="wave",
+            optimization_id=optimization_id,
+        )
 
         logger.info(f"Starting WAVE settings apply job {job_id} for camera {camera_id}")
 
-        # Create job tracking
+        # Update status to applying
+        self._update_job_status(job_id, "applying")
+
+        # Create in-memory job tracking for step details
         job = {
-            "job_id": job_id,
+            "id": job_id,
+            "job_id": job_id,  # For backward compatibility
             "camera_id": camera_id,
             "vms_camera_id": vms_camera_id,
             "status": ApplyStatus.IN_PROGRESS,
@@ -504,7 +694,7 @@ class ApplyService:
             "vms_system": "hanwha-wave"
         }
 
-        self.active_jobs[job_id] = job
+        self._job_cache[job_id] = job
 
         try:
             # Step 1: Connect to WAVE server
@@ -579,9 +769,17 @@ class ApplyService:
             job["completed_at"] = datetime.utcnow().isoformat() + "Z"
             job["steps"].append({"name": "Apply complete", "status": "completed"})
 
+            # Update database
+            self._update_job_status(job_id, "success")
+
+            # Clean up cache
+            if job_id in self._job_cache:
+                del self._job_cache[job_id]
+
             logger.info(f"WAVE apply job {job_id} completed successfully")
 
             return {
+                "id": job_id,
                 "job_id": job_id,
                 "status": ApplyStatus.COMPLETED,
                 "message": "Settings applied successfully via WAVE VMS",
@@ -602,7 +800,15 @@ class ApplyService:
             if job["steps"] and job["steps"][-1]["status"] == "in_progress":
                 job["steps"][-1]["status"] = "failed"
 
+            # Update database
+            self._update_job_status(job_id, "failed", error_message=str(e))
+
+            # Clean up cache
+            if job_id in self._job_cache:
+                del self._job_cache[job_id]
+
             return {
+                "id": job_id,
                 "job_id": job_id,
                 "status": ApplyStatus.FAILED,
                 "error": {

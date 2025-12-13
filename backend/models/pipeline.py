@@ -492,6 +492,7 @@ class OptimizationContext:
     notes: Optional[str] = None
     lighting_condition: Optional[str] = None  # "bright", "mixed", "low"
     motion_level: Optional[str] = None  # "low", "medium", "high"
+    datasheet_specs: Optional[Dict[str, Any]] = None  # Camera datasheet specifications
 
     def to_dict(self) -> Dict[str, Any]:
         result = {}
@@ -507,6 +508,8 @@ class OptimizationContext:
             result["lightingCondition"] = self.lighting_condition
         if self.motion_level:
             result["motionLevel"] = self.motion_level
+        if self.datasheet_specs:
+            result["datasheetSpecs"] = self.datasheet_specs
         return result
 
     @classmethod
@@ -518,6 +521,7 @@ class OptimizationContext:
             notes=data.get("notes"),
             lighting_condition=data.get("lightingCondition"),
             motion_level=data.get("motionLevel"),
+            datasheet_specs=data.get("datasheetSpecs"),
         )
 
 

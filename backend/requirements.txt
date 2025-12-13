@@ -18,6 +18,10 @@ alembic==1.14.0
 pillow>=10.0.0  # Use >= for latest compatible version with pre-built wheels
 python-multipart==0.0.20  # File upload support
 
+# ---- Datasheet Processing ----
+pdfplumber>=0.10.0  # PDF text extraction for camera datasheets
+duckduckgo-search>=6.0.0  # Web search for datasheet PDFs
+
 # ---- Camera Integration ----
 onvif-zeep==0.2.12  # ONVIF protocol support
 zeep==4.3.1  # SOAP client for ONVIF

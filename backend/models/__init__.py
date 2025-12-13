@@ -3,6 +3,7 @@
 PlatoniCam Data Models
 
 This package contains all data models for the optimization pipeline.
+Includes both Pydantic models (API validation) and SQLAlchemy models (persistence).
 """
 
 from .pipeline import (
@@ -69,4 +70,23 @@ __all__ = [
     # Pipeline
     "PipelineErrorModel",
     "PipelineContext",
+    # ORM Models
+    "CameraDatasheet",
+    "DatasheetFetchLog",
+    "Camera",
+    "Optimization",
+    "AppliedConfig",
 ]
+
+# Import ORM models (deferred to avoid circular imports)
+try:
+    from .orm import (
+        CameraDatasheet,
+        DatasheetFetchLog,
+        Camera,
+        Optimization,
+        AppliedConfig,
+    )
+except ImportError:
+    # ORM models may not be available if database is not initialized
+    pass
