@@ -22,10 +22,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 ### Frontend
-- Single `index.html` with embedded CSS/JavaScript (vanilla, no frameworks)
-- Deployed via GitHub Pages
+- Single `index.html` (~3,600 lines) with embedded CSS/JavaScript (vanilla, no frameworks)
+- Deployed via GitHub Pages at https://bneidlinger.github.io/cam_whisperer/
 - Contains fallback heuristic engine (`basicHeuristicEngine` function)
 - **Sites/Projects system** for organizing cameras (localStorage + JSON export/import)
+- Retro 80's industrial security aesthetic with CRT effects
 
 ### Backend (`backend/`)
 - **Framework**: FastAPI (Python 3.10+)
@@ -88,12 +89,17 @@ pytest tests/                                          # All tests
 pytest tests/backend/test_optimization.py              # Single file
 pytest tests/backend/test_optimization.py -k "heuristic"  # Pattern match
 pytest tests/ --cov=backend --cov-report=html          # With coverage
+
+# Integration tests (PowerShell, require live cameras/VMS)
+.\tests\backend\test_onvif.ps1   # ONVIF camera tests
+.\tests\backend\test_wave.ps1    # WAVE VMS tests
 ```
 
 ### Code Quality
 ```bash
 black .        # Format
 ruff check .   # Lint
+mypy .         # Type checking (optional)
 ```
 
 ### Deployment
@@ -195,10 +201,39 @@ AI_OPTIMIZATION_TIMEOUT_SECONDS=30
 LOG_LEVEL=INFO
 ```
 
+## Error Handling
+
+The backend uses a structured exception hierarchy (`errors.py`) where every error includes:
+- `recoverable` flag - whether retry/fallback is possible
+- `recovery_hint` - user-friendly guidance
+
+Key error categories:
+- **Discovery**: `DiscoveryError`, `NetworkScanError`, `VmsConnectionError`
+- **Optimization**: `ProviderError`, `ProviderRateLimitError`, `InvalidResponseError`
+- **Apply**: `ApplyError`, `PartialApplyError`, `ApplyTimeoutError`
+- **Auth**: `CameraAuthError`, `VmsAuthError`, `MissingApiKeyError`
+
+When adding error handling, raise from appropriate error class and include recovery hints.
+
+## Provider System
+
+The optimization engine uses a provider abstraction (`services/providers/base.py`):
+
+```python
+# Provider capabilities (check with provider.info.capabilities)
+SCENE_ANALYSIS     # Analyze sample frames
+MULTI_CAMERA       # Optimize multiple cameras together
+CONSTRAINT_SOLVING # Respect bandwidth/retention constraints
+OFFLINE            # Works without internet (heuristic only)
+```
+
+**Fallback behavior**: Claude AI → retry once on transient errors → heuristic engine
+
 ## Domain Context
 
 ### Camera Settings
 - **WDR**: Handles high-contrast scenes (bright windows)
+- **HLC**: High Light Compensation masks headlight glare (parking lots)
 - **IR**: Night vision illumination
 - **Shutter Speed**: 1/250-1/500 prevents blur but needs more light
 - **H.265 vs H.264**: H.265 offers ~50% better compression
