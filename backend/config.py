@@ -58,6 +58,21 @@ class Settings(BaseSettings):
     max_optimizations_per_hour: Optional[int] = None
     max_cameras_per_site: Optional[int] = None
 
+    # WebRTC Configuration (Phase 3)
+    webrtc_enabled: bool = True
+    webrtc_signaling_timeout_seconds: int = 30
+    webrtc_ice_timeout_seconds: int = 10
+
+    # TURN Server Configuration (for NAT traversal)
+    turn_server_url: str = ""  # e.g., "turn:turn.example.com:3478"
+    turn_server_urls: str = ""  # Comma-separated list for multiple servers
+    turn_username: str = ""
+    turn_credential: str = ""
+    turn_credential_type: str = "password"  # "password" or "oauth"
+
+    # STUN Server (free, for direct P2P when possible)
+    stun_server_urls: str = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+
     class Config:
         env_file = ".env"
         case_sensitive = False

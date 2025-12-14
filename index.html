@@ -1880,6 +1880,54 @@
     </div>
   </div>
 
+  <!-- WebRTC Live View Modal -->
+  <div class="modal-overlay" id="liveview-modal">
+    <div class="modal" style="max-width: 900px; width: 95%;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span id="liveview-title">Live View</span>
+          <span id="liveview-status" style="margin-left: 15px; font-size: 0.75rem; padding: 3px 8px; border-radius: 3px; background: var(--bg-primary);">Connecting...</span>
+        </div>
+        <button class="modal-close" id="liveview-close">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <!-- Video Container -->
+        <div id="liveview-video-container" style="position: relative; background: #000; min-height: 400px; display: flex; align-items: center; justify-content: center;">
+          <video id="liveview-video" autoplay playsinline muted style="max-width: 100%; max-height: 500px; display: none;"></video>
+          <div id="liveview-placeholder" style="color: var(--text-dim); text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 15px;">▶</div>
+            <div>Establishing WebRTC connection...</div>
+            <div id="liveview-connection-status" style="font-size: 0.8rem; margin-top: 10px;"></div>
+          </div>
+          <!-- RTSP Fallback Message -->
+          <div id="liveview-rtsp-fallback" style="display: none; color: var(--text-dim); text-align: center; padding: 20px;">
+            <div style="font-size: 2rem; margin-bottom: 15px;">⚠</div>
+            <div style="margin-bottom: 10px;">Camera does not support native WebRTC</div>
+            <div style="font-size: 0.85rem; color: var(--orange-glow);">RTSP URL:</div>
+            <code id="liveview-rtsp-url" style="display: block; margin: 10px 0; padding: 10px; background: var(--bg-secondary); border-radius: 4px; word-break: break-all;"></code>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">Use VLC or a media server for RTSP-to-WebRTC conversion</div>
+          </div>
+        </div>
+        <!-- Controls -->
+        <div style="padding: 15px; background: var(--bg-secondary); border-top: 1px solid var(--border-color);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 10px;">
+              <button id="liveview-snapshot-btn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" disabled>
+                📷 Snapshot
+              </button>
+              <button id="liveview-fullscreen-btn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" disabled>
+                ⛶ Fullscreen
+              </button>
+            </div>
+            <div id="liveview-stats" style="font-size: 0.7rem; color: var(--text-dim);">
+              <!-- Stats populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ============================================================
     // PlatoniCam - Frontend Application
@@ -3144,6 +3192,7 @@
                 <div style="font-size: 0.85rem; color: var(--text-dim);">${escapeHtml(cam.vendor || '')} ${escapeHtml(cam.model || '')}</div>
               </div>
               <div style="display: flex; gap: 8px;">
+                <button onclick="openLiveView('${cam.ip}')" class="btn" style="padding: 6px 12px; font-size: 0.75rem; background: var(--terminal-green); color: #000;">▶ Live</button>
                 <button onclick="selectCameraForOptimize('${cam.id}')" class="btn" style="padding: 6px 12px; font-size: 0.75rem;">Optimize</button>
                 <button onclick="viewCameraDetails('${cam.id}')" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;">Details</button>
               </div>
@@ -4177,6 +4226,434 @@
       }
 
       hideSiteModal();
+    });
+
+    // ---- WebRTC Live View ----
+
+    // WebRTC client class
+    class WebRTCLiveView {
+      constructor() {
+        this.ws = null;
+        this.pc = null;
+        this.sessionId = null;
+        this.cameraIp = null;
+        this.iceServers = [];
+        this.state = 'disconnected';
+        this.statsInterval = null;
+      }
+
+      async connect(cameraIp, cameraPort, username, password, profileToken = 'MainStream') {
+        this.cameraIp = cameraIp;
+        this.updateStatus('connecting', 'Connecting...');
+
+        // Get WebSocket URL
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${new URL(API_BASE).host}/api/webrtc/stream`;
+
+        try {
+          // Connect WebSocket
+          this.ws = new WebSocket(wsUrl);
+
+          this.ws.onopen = () => {
+            console.log('[WebRTC] WebSocket connected');
+            this.updateStatus('connecting', 'WebSocket connected...');
+
+            // Send connect request
+            this.ws.send(JSON.stringify({
+              type: 'connect',
+              camera_ip: cameraIp,
+              camera_port: cameraPort || 80,
+              username: username,
+              password: password,
+              profile_token: profileToken
+            }));
+          };
+
+          this.ws.onmessage = (event) => this.handleMessage(JSON.parse(event.data));
+
+          this.ws.onerror = (error) => {
+            console.error('[WebRTC] WebSocket error:', error);
+            this.updateStatus('error', 'Connection error');
+          };
+
+          this.ws.onclose = () => {
+            console.log('[WebRTC] WebSocket closed');
+            if (this.state !== 'disconnected') {
+              this.updateStatus('disconnected', 'Disconnected');
+            }
+            this.cleanup();
+          };
+
+        } catch (error) {
+          console.error('[WebRTC] Connection failed:', error);
+          this.updateStatus('error', error.message);
+          throw error;
+        }
+      }
+
+      handleMessage(msg) {
+        console.log('[WebRTC] Received:', msg.type, msg);
+
+        switch (msg.type) {
+          case 'session':
+            this.sessionId = msg.sessionId;
+            this.iceServers = msg.iceServers || [];
+            this.updateStatus('connecting', 'Session created...');
+            this.updateConnectionStatus(`Session: ${this.sessionId.substring(0, 8)}...`);
+            break;
+
+          case 'registered':
+            this.updateStatus('connecting', 'Registered with camera...');
+            // Create peer connection and send offer
+            this.createPeerConnection();
+            break;
+
+          case 'answer':
+            this.handleAnswer(msg.sdp);
+            break;
+
+          case 'ice-candidate':
+            this.handleRemoteIceCandidate(msg.candidate);
+            break;
+
+          case 'stream-opened':
+            this.updateStatus('streaming', 'Streaming');
+            this.startStats();
+            break;
+
+          case 'stream-closed':
+            this.updateStatus('disconnected', 'Stream closed');
+            this.disconnect();
+            break;
+
+          case 'rtsp-fallback':
+            this.handleRtspFallback(msg);
+            break;
+
+          case 'error':
+            console.error('[WebRTC] Error:', msg.code, msg.message);
+            this.updateStatus('error', msg.message);
+            break;
+
+          case 'ping':
+            // Keepalive, ignore
+            break;
+
+          default:
+            console.log('[WebRTC] Unknown message type:', msg.type);
+        }
+      }
+
+      async createPeerConnection() {
+        this.updateStatus('connecting', 'Creating peer connection...');
+
+        const config = {
+          iceServers: this.iceServers.length > 0 ? this.iceServers : [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        };
+
+        this.pc = new RTCPeerConnection(config);
+
+        // Handle incoming tracks
+        this.pc.ontrack = (event) => {
+          console.log('[WebRTC] Track received:', event.track.kind);
+          const video = document.getElementById('liveview-video');
+          if (event.streams && event.streams[0]) {
+            video.srcObject = event.streams[0];
+            video.style.display = 'block';
+            document.getElementById('liveview-placeholder').style.display = 'none';
+            document.getElementById('liveview-snapshot-btn').disabled = false;
+            document.getElementById('liveview-fullscreen-btn').disabled = false;
+            this.updateStatus('streaming', 'Streaming');
+          }
+        };
+
+        // Handle ICE candidates
+        this.pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            console.log('[WebRTC] Sending ICE candidate');
+            this.ws.send(JSON.stringify({
+              type: 'ice-candidate',
+              candidate: event.candidate
+            }));
+          }
+        };
+
+        // Handle connection state changes
+        this.pc.onconnectionstatechange = () => {
+          console.log('[WebRTC] Connection state:', this.pc.connectionState);
+          if (this.pc.connectionState === 'connected') {
+            this.updateStatus('streaming', 'Connected');
+            this.startStats();
+          } else if (this.pc.connectionState === 'failed') {
+            this.updateStatus('error', 'Connection failed');
+          } else if (this.pc.connectionState === 'disconnected') {
+            this.updateStatus('disconnected', 'Disconnected');
+          }
+        };
+
+        // Handle ICE connection state
+        this.pc.oniceconnectionstatechange = () => {
+          console.log('[WebRTC] ICE state:', this.pc.iceConnectionState);
+          this.updateConnectionStatus(`ICE: ${this.pc.iceConnectionState}`);
+        };
+
+        // Add transceiver for receiving video
+        this.pc.addTransceiver('video', { direction: 'recvonly' });
+        this.pc.addTransceiver('audio', { direction: 'recvonly' });
+
+        // Create and send offer
+        try {
+          const offer = await this.pc.createOffer();
+          await this.pc.setLocalDescription(offer);
+
+          console.log('[WebRTC] Sending offer');
+          this.ws.send(JSON.stringify({
+            type: 'offer',
+            sdp: offer.sdp
+          }));
+
+          this.updateStatus('connecting', 'Negotiating...');
+        } catch (error) {
+          console.error('[WebRTC] Failed to create offer:', error);
+          this.updateStatus('error', 'Failed to create offer');
+        }
+      }
+
+      async handleAnswer(sdp) {
+        console.log('[WebRTC] Received answer');
+        try {
+          await this.pc.setRemoteDescription({
+            type: 'answer',
+            sdp: sdp
+          });
+          this.updateStatus('connecting', 'Answer received...');
+        } catch (error) {
+          console.error('[WebRTC] Failed to set remote description:', error);
+          this.updateStatus('error', 'Failed to process answer');
+        }
+      }
+
+      async handleRemoteIceCandidate(candidate) {
+        if (this.pc && candidate) {
+          try {
+            await this.pc.addIceCandidate(candidate);
+            console.log('[WebRTC] Added remote ICE candidate');
+          } catch (error) {
+            console.error('[WebRTC] Failed to add ICE candidate:', error);
+          }
+        }
+      }
+
+      handleRtspFallback(msg) {
+        console.log('[WebRTC] RTSP fallback:', msg);
+        this.updateStatus('fallback', 'RTSP Fallback');
+
+        // Hide video placeholder, show RTSP fallback
+        document.getElementById('liveview-placeholder').style.display = 'none';
+        document.getElementById('liveview-rtsp-fallback').style.display = 'block';
+        document.getElementById('liveview-rtsp-url').textContent = msg.rtspUrl || 'RTSP URL not available';
+
+        // Store ICE servers for potential future use
+        this.iceServers = msg.iceServers || [];
+      }
+
+      startStats() {
+        if (this.statsInterval) return;
+
+        this.statsInterval = setInterval(async () => {
+          if (!this.pc) return;
+
+          try {
+            const stats = await this.pc.getStats();
+            let videoStats = null;
+
+            stats.forEach(report => {
+              if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                videoStats = report;
+              }
+            });
+
+            if (videoStats) {
+              const statsEl = document.getElementById('liveview-stats');
+              const fps = videoStats.framesPerSecond || 0;
+              const width = videoStats.frameWidth || 0;
+              const height = videoStats.frameHeight || 0;
+              const bytesReceived = videoStats.bytesReceived || 0;
+              const kbps = Math.round((bytesReceived * 8) / 1000);
+
+              statsEl.innerHTML = `${width}x${height} @ ${Math.round(fps)} fps | ${kbps} kbps`;
+            }
+          } catch (e) {
+            // Ignore stats errors
+          }
+        }, 1000);
+      }
+
+      updateStatus(state, text) {
+        this.state = state;
+        const statusEl = document.getElementById('liveview-status');
+
+        const colors = {
+          'disconnected': 'var(--text-dim)',
+          'connecting': 'var(--orange-glow)',
+          'streaming': 'var(--terminal-green)',
+          'error': '#ff4444',
+          'fallback': 'var(--orange-dark)'
+        };
+
+        statusEl.style.background = colors[state] || 'var(--bg-primary)';
+        statusEl.style.color = state === 'streaming' ? '#000' : '#fff';
+        statusEl.textContent = text;
+      }
+
+      updateConnectionStatus(text) {
+        document.getElementById('liveview-connection-status').textContent = text;
+      }
+
+      takeSnapshot() {
+        const video = document.getElementById('liveview-video');
+        if (!video.videoWidth) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+
+        return canvas.toDataURL('image/jpeg', 0.9);
+      }
+
+      toggleFullscreen() {
+        const container = document.getElementById('liveview-video-container');
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          container.requestFullscreen();
+        }
+      }
+
+      disconnect() {
+        console.log('[WebRTC] Disconnecting');
+
+        if (this.ws) {
+          try {
+            this.ws.send(JSON.stringify({ type: 'close' }));
+            this.ws.close();
+          } catch (e) {}
+          this.ws = null;
+        }
+
+        this.cleanup();
+        this.updateStatus('disconnected', 'Disconnected');
+      }
+
+      cleanup() {
+        if (this.statsInterval) {
+          clearInterval(this.statsInterval);
+          this.statsInterval = null;
+        }
+
+        if (this.pc) {
+          this.pc.close();
+          this.pc = null;
+        }
+
+        // Reset UI
+        const video = document.getElementById('liveview-video');
+        video.srcObject = null;
+        video.style.display = 'none';
+        document.getElementById('liveview-placeholder').style.display = 'block';
+        document.getElementById('liveview-rtsp-fallback').style.display = 'none';
+        document.getElementById('liveview-snapshot-btn').disabled = true;
+        document.getElementById('liveview-fullscreen-btn').disabled = true;
+        document.getElementById('liveview-stats').innerHTML = '';
+        document.getElementById('liveview-connection-status').textContent = '';
+      }
+    }
+
+    // Global live view instance
+    let activeLiveView = null;
+
+    // Open live view for a camera
+    async function openLiveView(cameraIp) {
+      const cam = getCurrentCameras().find(c => c.ip === cameraIp);
+      if (!cam) {
+        showToast('Camera not found');
+        return;
+      }
+
+      const creds = sessionCredentials[cameraIp];
+      if (!creds) {
+        showToast('No credentials cached. Re-add camera with credentials.');
+        return;
+      }
+
+      // Show modal
+      document.getElementById('liveview-modal').classList.add('active');
+      document.getElementById('liveview-title').textContent = `Live View - ${cam.ip}`;
+
+      // Close any existing connection
+      if (activeLiveView) {
+        activeLiveView.disconnect();
+      }
+
+      // Create new connection
+      activeLiveView = new WebRTCLiveView();
+
+      try {
+        await activeLiveView.connect(
+          cam.ip,
+          cam.port || 80,
+          creds.username,
+          creds.password
+        );
+      } catch (error) {
+        console.error('Failed to open live view:', error);
+        showToast('Failed to connect: ' + error.message);
+      }
+    }
+
+    // Close live view
+    function closeLiveView() {
+      if (activeLiveView) {
+        activeLiveView.disconnect();
+        activeLiveView = null;
+      }
+      document.getElementById('liveview-modal').classList.remove('active');
+    }
+
+    // Live view modal event listeners
+    document.getElementById('liveview-close').addEventListener('click', closeLiveView);
+
+    document.getElementById('liveview-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'liveview-modal') {
+        closeLiveView();
+      }
+    });
+
+    document.getElementById('liveview-snapshot-btn').addEventListener('click', () => {
+      if (activeLiveView) {
+        const snapshot = activeLiveView.takeSnapshot();
+        if (snapshot) {
+          // Update camera snapshot
+          const cam = getCurrentCameras().find(c => c.ip === activeLiveView.cameraIp);
+          if (cam) {
+            cam.snapshot = snapshot;
+            saveState();
+            updateCameraBay();
+            showToast('Snapshot captured from live view');
+          }
+        }
+      }
+    });
+
+    document.getElementById('liveview-fullscreen-btn').addEventListener('click', () => {
+      if (activeLiveView) {
+        activeLiveView.toggleFullscreen();
+      }
     });
 
     // ---- Initialize ----

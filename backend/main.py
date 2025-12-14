@@ -11,7 +11,7 @@ if not sys.warnoptions:
 else:
     warnings.filterwarnings("ignore", category=ResourceWarning)
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
@@ -1649,3 +1649,172 @@ async def list_apply_jobs(
         "offset": offset,
         "limit": limit,
     }
+
+
+# ---- WebRTC Endpoints (Phase 3) ----
+
+from integrations.webrtc_signaling import get_webrtc_gateway
+
+
+@app.get("/api/webrtc/config")
+async def get_webrtc_config():
+    """
+    Get WebRTC configuration including ICE servers.
+
+    Returns:
+        WebRTC configuration for browser clients including:
+        - enabled: Whether WebRTC is enabled
+        - iceServers: STUN/TURN server configuration
+    """
+    gateway = get_webrtc_gateway()
+
+    return {
+        "enabled": settings.webrtc_enabled,
+        "iceServers": gateway.get_ice_servers_config(),
+        "signalingTimeout": settings.webrtc_signaling_timeout_seconds,
+        "iceTimeout": settings.webrtc_ice_timeout_seconds,
+    }
+
+
+@app.get("/api/webrtc/sessions")
+async def list_webrtc_sessions():
+    """
+    List active WebRTC streaming sessions.
+
+    Returns:
+        List of active session information
+    """
+    gateway = get_webrtc_gateway()
+
+    return {
+        "sessions": gateway.get_active_sessions(),
+        "count": len(gateway.active_sessions),
+    }
+
+
+@app.delete("/api/webrtc/sessions/{session_id}")
+async def close_webrtc_session(session_id: str):
+    """
+    Close a specific WebRTC session.
+
+    Args:
+        session_id: Session ID to close
+
+    Returns:
+        Success status
+    """
+    gateway = get_webrtc_gateway()
+    closed = await gateway.close_session(session_id)
+
+    if not closed:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+    return {"status": "closed", "sessionId": session_id}
+
+
+class WebRTCConnectRequest(BaseModel):
+    """Request model for WebRTC connection"""
+    camera_ip: str
+    camera_port: int = 80
+    username: str
+    password: str
+    profile_token: str = "MainStream"
+
+
+@app.websocket("/api/webrtc/stream")
+async def webrtc_stream_endpoint(
+    websocket: WebSocket,
+):
+    """
+    WebSocket endpoint for WebRTC signaling.
+
+    This endpoint establishes a WebRTC connection to a camera for low-latency
+    video streaming. The browser connects here and sends connection details
+    as the first message.
+
+    Protocol:
+    1. Browser connects to this WebSocket
+    2. Browser sends connection request: {"type": "connect", "camera_ip": "...", ...}
+    3. Server proxies signaling to camera
+    4. SDP offer/answer and ICE candidates are exchanged
+    5. Media streams directly between browser and camera (P2P or via TURN)
+
+    Message Types (Browser -> Server):
+        - connect: Initial connection request with camera details
+        - offer: SDP offer from browser
+        - ice-candidate: ICE candidate from browser
+        - close: Close the session
+
+    Message Types (Server -> Browser):
+        - session: Session created, includes ICE server config
+        - registered: Registered with camera
+        - answer: SDP answer from camera
+        - ice-candidate: ICE candidate from camera
+        - stream-opened: Stream is active
+        - stream-closed: Stream ended
+        - error: Error occurred
+        - rtsp-fallback: Camera doesn't support WebRTC, use RTSP
+    """
+    if not settings.webrtc_enabled:
+        await websocket.close(code=4001, reason="WebRTC is disabled")
+        return
+
+    await websocket.accept()
+    logger.info(f"WebRTC WebSocket connected from {websocket.client.host}")
+
+    gateway = get_webrtc_gateway()
+
+    try:
+        # Wait for connection request
+        connect_msg = await websocket.receive_json()
+
+        if connect_msg.get("type") != "connect":
+            await websocket.send_json({
+                "type": "error",
+                "code": "INVALID_REQUEST",
+                "message": "First message must be a 'connect' request",
+            })
+            await websocket.close()
+            return
+
+        # Extract connection details
+        camera_ip = connect_msg.get("camera_ip") or connect_msg.get("cameraIp")
+        camera_port = connect_msg.get("camera_port") or connect_msg.get("cameraPort", 80)
+        username = connect_msg.get("username", "admin")
+        password = connect_msg.get("password", "")
+        profile_token = connect_msg.get("profile_token") or connect_msg.get("profileToken", "MainStream")
+
+        if not camera_ip:
+            await websocket.send_json({
+                "type": "error",
+                "code": "MISSING_CAMERA_IP",
+                "message": "camera_ip is required",
+            })
+            await websocket.close()
+            return
+
+        logger.info(f"WebRTC connection requested for camera {camera_ip}:{camera_port}")
+
+        # Handle the WebRTC signaling
+        await gateway.handle_browser_connection(
+            browser_ws=websocket,
+            camera_ip=camera_ip,
+            camera_port=camera_port,
+            username=username,
+            password=password,
+            profile_token=profile_token,
+        )
+
+    except WebSocketDisconnect:
+        logger.info(f"WebRTC WebSocket disconnected from {websocket.client.host}")
+    except Exception as e:
+        logger.error(f"WebRTC WebSocket error: {e}", exc_info=True)
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "code": "SERVER_ERROR",
+                "message": str(e),
+            })
+        except Exception:
+            pass
+        await websocket.close()

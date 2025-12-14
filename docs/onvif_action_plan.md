@@ -461,8 +461,8 @@ def create_secure_context() -> ssl.SSLContext:
 | 2.1 | Media2 service | Critical | 5 days | ✅ DONE |
 | 2.2 | H.265 config | High | 2 days | ✅ DONE |
 | 2.3 | RTSPS support | High | 2 days | ✅ DONE |
-| 3.1 | WebRTC signaling | Medium | 1 week | ⏳ NOT STARTED |
-| 3.2 | TURN integration | Medium | 3 days | ⏳ NOT STARTED |
+| 3.1 | WebRTC signaling | Medium | 1 week | ✅ DONE |
+| 3.2 | TURN integration | Medium | 3 days | ✅ DONE |
 | 4.1 | MQTT events | Medium | 1 week | ⏳ NOT STARTED |
 | 4.2 | Metadata parsing | Low | 3 days | ⏳ NOT STARTED |
 | 5.x | Security hardening | Ongoing | Continuous | 🔄 PARTIAL |
@@ -478,6 +478,18 @@ def create_secure_context() -> ssl.SSLContext:
 - H.265 config and RTSPS support integrated into ONVIFClient
 - Tested with Hanwha QNV-C8011R (Profile S only - no H.265 via ONVIF)
 
+**Phase 3 (Completed 2025-12-14):**
+- Created `backend/integrations/webrtc_signaling.py` (~550 lines)
+- ONVIFWebRTCGateway class with JSON-RPC 2.0 signaling
+- WebSocket proxy between browser and camera
+- SDP offer/answer exchange
+- ICE candidate forwarding
+- RTSP fallback for non-WebRTC cameras
+- Session management with state tracking
+- Added WebRTC config settings (STUN/TURN servers)
+- Added WebSocket endpoint `/api/webrtc/stream`
+- Added REST endpoints: `/api/webrtc/config`, `/api/webrtc/sessions`
+
 **Phase 5 (Partial):**
 - ResourceWarning suppression added
 - TLS certificate validation not yet implemented
@@ -491,7 +503,7 @@ def create_secure_context() -> ssl.SSLContext:
 | File | Purpose | Status |
 |------|---------|--------|
 | `backend/integrations/media2_client.py` | Profile T Media2 service | ✅ CREATED |
-| `backend/integrations/webrtc_signaling.py` | WebRTC gateway | ⏳ TODO |
+| `backend/integrations/webrtc_signaling.py` | WebRTC gateway | ✅ CREATED |
 | `backend/integrations/mqtt_events.py` | MQTT event bridge | ⏳ TODO |
 | `backend/integrations/metadata_parser.py` | Analytics metadata | ⏳ TODO |
 
@@ -503,7 +515,7 @@ def create_secure_context() -> ssl.SSLContext:
 | `backend/main.py` | Warning suppression | ✅ DONE |
 | `backend/start.bat` | PYTHONWARNINGS env var | ✅ DONE |
 | `backend/start.ps1` | PYTHONWARNINGS env var | ✅ DONE |
-| `backend/config.py` | TURN server, MQTT broker settings | ⏳ TODO |
+| `backend/config.py` | WebRTC/TURN config (MQTT TODO) | ✅ WebRTC DONE |
 
 ---
 
