@@ -532,8 +532,27 @@ class ONVIFWebRTCGateway:
                 password,
             )
 
+            # Get available profiles and find the best one
+            profiles = await client.get_media_profiles(camera)
+            profile_token = session.profile_token
+
+            # If default token doesn't work, find first H.264 profile
+            if profiles:
+                # Prefer H.264 profile for better compatibility
+                h264_profile = next(
+                    (p for p in profiles if p.get("encoding") == "H264"),
+                    None
+                )
+                if h264_profile:
+                    profile_token = h264_profile.get("token", profile_token)
+                    logger.info(f"[{session.session_id}] Using profile: {h264_profile.get('name')} ({profile_token})")
+                elif profiles:
+                    # Fall back to first available profile
+                    profile_token = profiles[0].get("token", profile_token)
+                    logger.info(f"[{session.session_id}] Using first profile: {profiles[0].get('name')} ({profile_token})")
+
             # Get stream URI
-            stream_uri = await client.get_stream_uri(camera, session.profile_token)
+            stream_uri = await client.get_stream_uri(camera, profile_token)
 
             await self._send_to_browser(session, {
                 "type": "rtsp-fallback",
