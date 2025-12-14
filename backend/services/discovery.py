@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # Lazy imports to avoid circular dependencies
 _datasheet_service = None
 _camera_service = None
+_network_filter = None
 
 def _get_datasheet_service():
     """Lazy getter for datasheet service."""
@@ -44,6 +45,18 @@ def _get_camera_service():
         except ImportError as e:
             logger.warning(f"Camera service not available: {e}")
     return _camera_service
+
+
+def _get_network_filter():
+    """Lazy getter for network filter."""
+    global _network_filter
+    if _network_filter is None:
+        try:
+            from utils.network_filter import get_network_filter
+            _network_filter = get_network_filter()
+        except ImportError as e:
+            logger.warning(f"Network filter not available: {e}")
+    return _network_filter
 
 
 class DiscoveryService:
@@ -70,12 +83,16 @@ class DiscoveryService:
 
         Args:
             timeout: Discovery timeout in seconds
-            max_cameras: Maximum cameras to return
+            max_cameras: Maximum cameras to return (default: 100 for safety)
 
         Returns:
             List of discovered camera records
         """
         logger.info("Starting ONVIF camera discovery...")
+
+        # Apply safe default for max_cameras to prevent resource exhaustion
+        if max_cameras is None:
+            max_cameras = 100
 
         try:
             cameras = await self.onvif_client.discover_cameras(
@@ -87,6 +104,20 @@ class DiscoveryService:
             for camera in cameras:
                 camera["discovery_method"] = "onvif"
                 camera["registered"] = False  # Will be updated by auto-register
+
+            # Apply network filtering (MAC/OUI/subnet)
+            network_filter = _get_network_filter()
+            if network_filter:
+                # Enrich with vendor info from MAC OUI lookup
+                cameras = network_filter.enrich_with_vendor(cameras)
+                # Apply filters
+                original_count = len(cameras)
+                cameras = network_filter.filter_cameras(cameras)
+                if len(cameras) < original_count:
+                    logger.info(
+                        f"Network filter: {original_count - len(cameras)} cameras "
+                        f"removed, {len(cameras)} remaining"
+                    )
 
             # Trigger background datasheet fetch for discovered cameras
             self._trigger_datasheet_fetch(cameras)
@@ -482,6 +513,20 @@ class DiscoveryService:
                 camera["wave_server"] = server_ip
 
             wave_client.close()
+
+            # Apply network filtering (MAC/OUI/subnet)
+            network_filter = _get_network_filter()
+            if network_filter:
+                # Enrich with vendor info from MAC OUI lookup
+                cameras = network_filter.enrich_with_vendor(cameras)
+                # Apply filters
+                original_count = len(cameras)
+                cameras = network_filter.filter_cameras(cameras)
+                if len(cameras) < original_count:
+                    logger.info(
+                        f"Network filter: {original_count - len(cameras)} cameras "
+                        f"removed, {len(cameras)} remaining"
+                    )
 
             # Trigger background datasheet fetch for discovered cameras
             self._trigger_datasheet_fetch(cameras)

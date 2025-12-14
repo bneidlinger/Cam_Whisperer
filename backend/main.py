@@ -15,6 +15,8 @@ from services.discovery import DiscoveryService
 from services.apply import ApplyService, ApplyMethod
 from services.datasheet_service import get_datasheet_service
 from services.camera_service import get_camera_service
+from utils.rate_limiter import get_discovery_rate_limiter, RateLimitError
+from utils.network_filter import get_network_filter, configure_network_filter, get_known_camera_ouis
 
 # Configure logging
 logging.basicConfig(
@@ -53,6 +55,24 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": str(exc),
             "type": type(exc).__name__,
             "traceback": traceback.format_exc() if settings.debug else None
+        }
+    )
+
+
+# Rate limit exception handler
+@app.exception_handler(RateLimitError)
+async def rate_limit_exception_handler(request: Request, exc: RateLimitError):
+    """Handle rate limit errors with proper 429 response"""
+    logger.warning(f"Rate limit exceeded for {request.client.host}: {exc}")
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": str(exc),
+            "type": "RateLimitError",
+            "retry_after_seconds": exc.retry_after_seconds,
+        },
+        headers={
+            "Retry-After": str(exc.retry_after_seconds),
         }
     )
 
@@ -186,20 +206,38 @@ async def health_check():
 
 @app.get("/api/discover")
 async def discover_cameras(
+    request: Request,
     timeout: int = 5,
-    max_cameras: Optional[int] = None
+    max_cameras: Optional[int] = 100
 ):
     """
     Discover ONVIF cameras on the network using WS-Discovery.
 
+    Rate limited to prevent network flooding (max 3 requests/minute per client,
+    30 second minimum between requests).
+
     Args:
-        timeout: Discovery timeout in seconds (default: 5)
-        max_cameras: Maximum number of cameras to return (default: all)
+        timeout: Discovery timeout in seconds (default: 5, max: 30)
+        max_cameras: Maximum number of cameras to return (default: 100)
 
     Returns:
         List of discovered cameras with IP, vendor, model, etc.
+
+    Raises:
+        429: Rate limit exceeded
     """
-    logger.info(f"Camera discovery requested (timeout={timeout}s, max={max_cameras})")
+    # Get client identifier for rate limiting
+    client_id = request.client.host if request.client else "unknown"
+
+    # Check rate limit (raises RateLimitError if exceeded)
+    rate_limiter = get_discovery_rate_limiter()
+    rate_limiter.check_rate_limit(client_id)
+
+    # Enforce safe limits
+    timeout = min(timeout, 30)  # Max 30 second timeout
+    max_cameras = min(max_cameras or 100, 500)  # Max 500 cameras
+
+    logger.info(f"Camera discovery requested from {client_id} (timeout={timeout}s, max={max_cameras})")
 
     try:
         discovery_service = DiscoveryService()
@@ -208,12 +246,19 @@ async def discover_cameras(
             max_cameras=max_cameras
         )
 
+        # Get rate limit status for response headers
+        rate_status = rate_limiter.get_status(client_id)
+
         logger.info(f"Discovery complete: found {len(cameras)} cameras")
 
         return {
             "cameras": cameras,
             "scanDuration": timeout,
-            "foundCameras": len(cameras)
+            "foundCameras": len(cameras),
+            "rateLimit": {
+                "remaining": rate_status["requests_remaining"],
+                "resetSeconds": rate_status["reset_seconds"],
+            }
         }
 
     except Exception as e:
@@ -499,6 +544,7 @@ async def monitor_tick():
 
 @app.get("/api/wave/discover")
 async def discover_wave_cameras(
+    request: Request,
     server_ip: str,
     port: int = 7001,
     username: str = "admin",
@@ -507,6 +553,8 @@ async def discover_wave_cameras(
 ):
     """
     Discover cameras via Hanwha WAVE VMS
+
+    Rate limited to prevent abuse (max 3 requests/minute per client).
 
     Args:
         server_ip: WAVE server IP address
@@ -517,8 +565,18 @@ async def discover_wave_cameras(
 
     Returns:
         List of cameras in WAVE system
+
+    Raises:
+        429: Rate limit exceeded
     """
-    logger.info(f"WAVE camera discovery requested for server {server_ip}:{port}")
+    # Get client identifier for rate limiting
+    client_id = request.client.host if request.client else "unknown"
+
+    # Check rate limit (raises RateLimitError if exceeded)
+    rate_limiter = get_discovery_rate_limiter()
+    rate_limiter.check_rate_limit(client_id)
+
+    logger.info(f"WAVE camera discovery requested from {client_id} for server {server_ip}:{port}")
 
     try:
         discovery_service = DiscoveryService()
@@ -530,13 +588,20 @@ async def discover_wave_cameras(
             use_https=use_https
         )
 
+        # Get rate limit status for response
+        rate_status = rate_limiter.get_status(client_id)
+
         logger.info(f"WAVE discovery complete: found {len(cameras)} cameras")
 
         return {
             "cameras": cameras,
             "foundCameras": len(cameras),
             "vmsSystem": "hanwha-wave",
-            "serverIp": server_ip
+            "serverIp": server_ip,
+            "rateLimit": {
+                "remaining": rate_status["requests_remaining"],
+                "resetSeconds": rate_status["reset_seconds"],
+            }
         }
 
     except Exception as e:
@@ -819,6 +884,123 @@ async def list_datasheets(manufacturer: Optional[str] = None):
     return {
         "datasheets": datasheets,
         "count": len(datasheets)
+    }
+
+
+# ---- Network Security Endpoints ----
+
+class NetworkFilterConfigRequest(BaseModel):
+    """Request body for configuring network filter"""
+    enabled: bool = False
+    allowed_ouis: Optional[List[str]] = None
+    allowed_macs: Optional[List[str]] = None
+    blocked_macs: Optional[List[str]] = None
+    allowed_subnets: Optional[List[str]] = None
+    vendor_filter: Optional[List[str]] = None
+    allow_unknown_oui: bool = True
+
+
+@app.get("/api/security/rate-limit/status")
+async def get_rate_limit_status(request: Request):
+    """
+    Get rate limit status for the current client.
+
+    Returns:
+        Rate limit status including remaining requests and reset time
+    """
+    client_id = request.client.host if request.client else "unknown"
+    rate_limiter = get_discovery_rate_limiter()
+    status = rate_limiter.get_status(client_id)
+
+    return {
+        "client_id": client_id,
+        "status": status,
+    }
+
+
+@app.get("/api/security/network-filter")
+async def get_network_filter_config():
+    """
+    Get current network filter configuration.
+
+    Returns:
+        Current filter settings and state
+    """
+    network_filter = get_network_filter()
+    config = network_filter.config
+
+    return {
+        "enabled": config.enabled,
+        "mode": config.mode,
+        "allowed_ouis": list(config.allowed_ouis),
+        "allowed_macs": list(config.allowed_macs),
+        "blocked_macs": list(config.blocked_macs),
+        "allowed_subnets": list(config.allowed_subnets),
+        "vendor_filter": list(config.vendor_filter),
+        "allow_unknown_oui": config.allow_unknown_oui,
+    }
+
+
+@app.put("/api/security/network-filter")
+async def update_network_filter_config(req: NetworkFilterConfigRequest):
+    """
+    Update network filter configuration.
+
+    This controls which discovered cameras are allowed/blocked based on:
+    - MAC address whitelist/blacklist
+    - OUI (vendor) prefix filtering
+    - IP subnet restrictions
+    - Vendor name filtering
+
+    Args:
+        req: Filter configuration
+
+    Returns:
+        Updated configuration
+    """
+    logger.info(f"Updating network filter: enabled={req.enabled}")
+
+    configure_network_filter(
+        enabled=req.enabled,
+        allowed_ouis=req.allowed_ouis,
+        allowed_macs=req.allowed_macs,
+        blocked_macs=req.blocked_macs,
+        allowed_subnets=req.allowed_subnets,
+        vendor_filter=req.vendor_filter,
+        allow_unknown_oui=req.allow_unknown_oui,
+    )
+
+    return {
+        "message": "Network filter configuration updated",
+        "enabled": req.enabled,
+    }
+
+
+@app.get("/api/security/known-ouis")
+async def get_known_ouis():
+    """
+    Get list of known camera manufacturer OUIs.
+
+    These are the first 3 bytes of MAC addresses mapped to vendor names.
+    Useful for configuring OUI-based filtering.
+
+    Returns:
+        Dictionary of OUI prefixes to vendor names
+    """
+    ouis = get_known_camera_ouis()
+
+    # Group by vendor for easier reading
+    by_vendor = {}
+    for oui, vendor in ouis.items():
+        if vendor not in by_vendor:
+            by_vendor[vendor] = []
+        by_vendor[vendor].append(oui)
+
+    return {
+        "ouis": ouis,
+        "by_vendor": by_vendor,
+        "total_ouis": len(ouis),
+        "total_vendors": len(by_vendor),
     }
 
 
