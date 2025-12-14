@@ -125,6 +125,9 @@ Write-Host "  Press Ctrl+C to stop all services" -ForegroundColor Yellow
 Write-Host " ============================================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Suppress ResourceWarning from wsdiscovery library
+$env:PYTHONWARNINGS = "ignore::ResourceWarning"
+
 # Start backend (blocks until Ctrl+C)
 try {
     uvicorn main:app --reload --host 0.0.0.0 --port 8000

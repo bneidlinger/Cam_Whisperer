@@ -2,18 +2,25 @@
 Camera Discovery Service
 
 Handles camera discovery via:
-- ONVIF WS-Discovery
+- ONVIF WS-Discovery (with scope filtering for large networks)
+- Direct connection mode (bypasses discovery for known IPs)
 - Hanwha WAVE VMS API
 - Manual registration
 
 Also triggers background datasheet fetching for discovered cameras.
+
+Phase 1 Improvements:
+- Scope-based discovery filtering to prevent broadcast storms
+- Direct connect mode for known camera IPs (more secure)
+- Profile T capability detection
+- Connection pooling for repeated operations
 """
 
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
 
-from integrations.onvif_client import ONVIFClient
+from integrations.onvif_client import ONVIFClient, ONVIFBatchClient
 from integrations.hanwha_wave_client import HanwhaWAVEClient
 
 logger = logging.getLogger(__name__)
@@ -76,7 +83,10 @@ class DiscoveryService:
     async def discover_onvif_cameras(
         self,
         timeout: int = 5,
-        max_cameras: Optional[int] = None
+        max_cameras: Optional[int] = None,
+        scopes: Optional[List[str]] = None,
+        location_filter: Optional[str] = None,
+        manufacturer_filter: Optional[str] = None
     ) -> List[Dict]:
         """
         Discover cameras via ONVIF WS-Discovery
@@ -84,11 +94,27 @@ class DiscoveryService:
         Args:
             timeout: Discovery timeout in seconds
             max_cameras: Maximum cameras to return (default: 100 for safety)
+            scopes: List of scope URIs to filter by (reduces broadcast traffic)
+            location_filter: Filter by location scope (e.g., "building1")
+            manufacturer_filter: Filter by manufacturer (e.g., "Hanwha")
 
         Returns:
             List of discovered camera records
+
+        Note:
+            For large networks (100+ cameras), use scope filtering to prevent
+            broadcast storms that can overwhelm the network interface buffer.
         """
-        logger.info("Starting ONVIF camera discovery...")
+        filters_desc = []
+        if scopes:
+            filters_desc.append(f"scopes={scopes}")
+        if location_filter:
+            filters_desc.append(f"location={location_filter}")
+        if manufacturer_filter:
+            filters_desc.append(f"manufacturer={manufacturer_filter}")
+
+        filter_str = f" with filters: {', '.join(filters_desc)}" if filters_desc else ""
+        logger.info(f"Starting ONVIF camera discovery{filter_str}...")
 
         # Apply safe default for max_cameras to prevent resource exhaustion
         if max_cameras is None:
@@ -97,7 +123,10 @@ class DiscoveryService:
         try:
             cameras = await self.onvif_client.discover_cameras(
                 timeout=timeout,
-                max_cameras=max_cameras
+                max_cameras=max_cameras,
+                scopes=scopes,
+                location_filter=location_filter,
+                manufacturer_filter=manufacturer_filter
             )
 
             # Enrich with additional metadata
@@ -203,6 +232,42 @@ class DiscoveryService:
         logger.info(f"Auto-registered {registered_count}/{len(cameras)} discovered cameras")
 
 
+    async def direct_connect_camera(
+        self,
+        ip: str,
+        port: int,
+        username: str,
+        password: str
+    ) -> Dict:
+        """
+        Direct connection to camera - bypasses WS-Discovery entirely.
+
+        More secure than discovery as it doesn't broadcast on the network.
+        Use this when the camera IP is already known.
+
+        Args:
+            ip: Camera IP address
+            port: ONVIF port (usually 80)
+            username: Camera username
+            password: Camera password
+
+        Returns:
+            Dictionary with camera info, capabilities, and connection status
+        """
+        logger.info(f"Direct connecting to camera at {ip}:{port}...")
+
+        result = await self.onvif_client.direct_connect(ip, port, username, password)
+
+        # Trigger background datasheet fetch if connected
+        if result.get("connected") and result.get("device_info"):
+            device_info = result["device_info"]
+            manufacturer = device_info.get("manufacturer")
+            model = device_info.get("model")
+            if manufacturer and model:
+                self._trigger_datasheet_fetch([{"vendor": manufacturer, "model": model}])
+
+        return result
+
     async def get_camera_capabilities(
         self,
         ip: str,
@@ -220,16 +285,19 @@ class DiscoveryService:
             password: Camera password
 
         Returns:
-            Dictionary with capabilities
+            Dictionary with capabilities including Profile T detection
         """
         logger.info(f"Querying capabilities for camera at {ip}:{port}...")
 
         try:
-            # Connect to camera
+            # Connect to camera (uses connection pooling)
             camera = await self.onvif_client.connect_camera(ip, port, username, password)
 
             # Get device info
             device_info = await self.onvif_client.get_camera_info(camera)
+
+            # Get service capabilities (includes Profile T detection)
+            service_caps = await self.onvif_client.get_service_capabilities(camera)
 
             # Get encoder configs
             encoder_configs = await self.onvif_client.get_video_encoder_configs(camera)
@@ -257,9 +325,35 @@ class DiscoveryService:
                 "max_resolution": self._get_max_resolution(encoder_configs),
                 "supported_codecs": self._get_supported_codecs(encoder_configs),
                 "max_fps": self._get_max_fps(encoder_configs),
-                "has_imaging_service": device_info.get("capabilities", {}).get("imaging", False),
+                "has_imaging_service": service_caps.get("imaging", False),
+                # Profile T detection (Phase 1 improvement)
+                "profile_t_supported": service_caps.get("profile_t_supported", False),
+                "profile_s_supported": service_caps.get("profile_s_supported", True),
+                "media2_supported": service_caps.get("media2_supported", False),
+                "service_capabilities": service_caps,
+                # H.265 capabilities (Phase 2 improvement)
+                "h265_supported": False,
+                "h265_profiles": [],
+                "max_h265_resolution": None,
                 "queried_at": datetime.utcnow().isoformat() + "Z"
             }
+
+            # Check H.265 capabilities if Profile T is supported (Phase 2)
+            if capabilities["profile_t_supported"]:
+                try:
+                    h265_caps = await self.onvif_client.get_h265_capabilities(camera)
+                    capabilities["h265_supported"] = h265_caps.get("h265_supported", False)
+                    capabilities["h265_profiles"] = h265_caps.get("h265_profiles", [])
+                    capabilities["max_h265_resolution"] = h265_caps.get("max_h265_resolution")
+                except Exception as e:
+                    logger.warning(f"Could not query H.265 capabilities: {e}")
+
+            # Log Profile T status
+            if capabilities["profile_t_supported"]:
+                h265_status = "H.265 supported" if capabilities["h265_supported"] else "H.265 not available"
+                logger.info(f"Camera {ip} supports Profile T ({h265_status})")
+            else:
+                logger.warning(f"Camera {ip} only supports Profile S (deprecated Oct 2025)")
 
             # Trigger background datasheet fetch
             manufacturer = device_info.get("manufacturer")

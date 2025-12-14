@@ -1,8 +1,20 @@
 # backend/main.py
+
+# Suppress ResourceWarning from wsdiscovery library (unclosed sockets in daemon threads)
+# Must be done before any other imports, using simplefilter for thread safety
+import warnings
+import sys
+
+# Aggressively suppress ResourceWarnings (wsdiscovery has socket cleanup issues in threads)
+if not sys.warnoptions:
+    warnings.simplefilter("ignore", ResourceWarning)
+else:
+    warnings.filterwarnings("ignore", category=ResourceWarning)
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 import datetime
 import logging
@@ -134,6 +146,36 @@ class StreamSettings(BaseModel):
     cbr: Optional[bool] = None
     profile: Optional[str] = None
 
+    @field_validator('fps', 'gopSize', 'keyframeInterval', mode='before')
+    @classmethod
+    def coerce_int(cls, v):
+        """Coerce string values to int"""
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return v
+        if isinstance(v, (str, float)):
+            import re
+            match = re.match(r'^(-?\d+)', str(v))
+            if match:
+                return int(match.group(1))
+        return None
+
+    @field_validator('bitrateMbps', mode='before')
+    @classmethod
+    def coerce_float(cls, v):
+        """Coerce string values to float"""
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            import re
+            match = re.match(r'^(-?\d+\.?\d*)', str(v))
+            if match:
+                return float(match.group(1))
+        return None
+
 class ExposureSettings(BaseModel):
     mode: Optional[str] = None
     shutter: Optional[str] = None
@@ -162,6 +204,22 @@ class ImageSettings(BaseModel):
     flip: Optional[bool] = None
     rotation: Optional[int] = None
     dewarp: Optional[str] = None
+
+    @field_validator('sharpness', 'sharpening', 'contrast', 'saturation', 'brightness', 'rotation', mode='before')
+    @classmethod
+    def coerce_int(cls, v):
+        """Coerce string values to int (Claude sometimes returns strings)"""
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            # Remove any non-numeric suffixes and convert
+            import re
+            match = re.match(r'^(-?\d+)', str(v))
+            if match:
+                return int(match.group(1))
+        return None
 
 class CameraCurrentSettings(BaseModel):
     stream: StreamSettings
@@ -347,12 +405,254 @@ async def get_current_settings(
         logger.error(f"Failed to query current settings: {e}", exc_info=True)
         raise
 
-# ---- Snapshot endpoint (for HTML UI to call if you want) ----
+# ---- Camera Connect & Snapshot endpoints ----
 
-@app.post("/api/camera/{camera_id}/snapshot")
-async def snapshot(camera_id: str):
-    # TODO: Pull real JPEG from RTSP / camera API / VMS
-    return {"cameraId": camera_id, "snapshotUrl": f"/static/mock_{camera_id}.jpg"}
+class CameraConnectRequest(BaseModel):
+    """Request to connect to a camera and fetch all details"""
+    ip: str
+    port: int = 80
+    username: str
+    password: str
+    vmsSystem: Optional[str] = None  # "hanwha-wave" or None for direct ONVIF
+    vmsCameraId: Optional[str] = None
+    waveServerIp: Optional[str] = None
+    wavePort: Optional[int] = 7001
+
+@app.post("/api/camera/connect")
+async def connect_camera(req: CameraConnectRequest):
+    """
+    Connect to a camera and fetch all available information.
+
+    Returns capabilities, current settings, and a snapshot.
+    This is the main endpoint for the "Camera Bay" feature.
+    """
+    logger.info(f"Connecting to camera at {req.ip}:{req.port}")
+
+    result = {
+        "ip": req.ip,
+        "port": req.port,
+        "connected": False,
+        "deviceInfo": None,
+        "capabilities": None,
+        "currentSettings": None,
+        "snapshot": None,
+        "snapshotMediaType": None,
+        "profiles": None,
+        "errors": []
+    }
+
+    try:
+        discovery_service = DiscoveryService()
+
+        # Get device info and capabilities via ONVIF
+        try:
+            # Create camera connection
+            camera_id = f"CAM-{req.ip.replace('.', '-')}"
+
+            # Get capabilities
+            caps = await discovery_service.get_camera_capabilities(
+                ip=req.ip,
+                port=req.port,
+                username=req.username,
+                password=req.password
+            )
+            result["capabilities"] = caps
+            result["connected"] = True
+
+            # Extract device info from caps if available
+            if caps:
+                device = caps.get("device", {})
+                result["deviceInfo"] = {
+                    "vendor": device.get("manufacturer"),
+                    "model": device.get("model"),
+                    "firmware": device.get("firmware"),
+                    "serialNumber": device.get("serial"),
+                    "hardwareId": device.get("hardware_id"),
+                }
+                # Also add flattened capabilities for easier frontend access
+                result["capabilities"] = {
+                    **caps,
+                    "vendor": device.get("manufacturer"),
+                    "model": device.get("model"),
+                    "resolutions": [caps.get("max_resolution")] if caps.get("max_resolution") else [],
+                    "codecs": caps.get("supported_codecs", []),
+                    "maxFps": caps.get("max_fps"),
+                }
+
+        except Exception as e:
+            logger.warning(f"Failed to get capabilities: {e}")
+            result["errors"].append(f"Capabilities: {str(e)}")
+
+        # Get current settings
+        try:
+            settings = await discovery_service.get_current_settings(
+                ip=req.ip,
+                port=req.port,
+                username=req.username,
+                password=req.password
+            )
+            result["currentSettings"] = settings
+        except Exception as e:
+            logger.warning(f"Failed to get current settings: {e}")
+            result["errors"].append(f"Settings: {str(e)}")
+
+        # Get snapshot via ONVIF
+        try:
+            snapshot_data = await get_camera_snapshot_onvif(
+                camera_ip=req.ip,
+                port=req.port,
+                username=req.username,
+                password=req.password
+            )
+            if snapshot_data:
+                result["snapshot"] = snapshot_data["base64"]
+                result["snapshotMediaType"] = snapshot_data["mediaType"]
+        except Exception as e:
+            logger.warning(f"Failed to get snapshot: {e}")
+            result["errors"].append(f"Snapshot: {str(e)}")
+
+        # Get media profiles for future use
+        try:
+            from integrations.onvif_client import ONVIFClient
+            client = ONVIFClient()
+            camera = await client.connect_camera(
+                ip=req.ip,
+                port=req.port,
+                username=req.username,
+                password=req.password
+            )
+            profiles = await client.get_media_profiles(camera)
+            result["profiles"] = profiles
+        except Exception as e:
+            logger.warning(f"Failed to get profiles: {e}")
+            # Don't add to errors - profiles are optional
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Camera connect failed: {e}", exc_info=True)
+        result["errors"].append(str(e))
+        return result
+
+
+async def get_camera_snapshot_onvif(
+    camera_ip: str,
+    port: int,
+    username: str,
+    password: str
+) -> Optional[dict]:
+    """
+    Get snapshot from camera via ONVIF.
+
+    Returns dict with base64 data and media type, or None if failed.
+    """
+    import base64
+    import httpx
+    from integrations.onvif_client import ONVIFClient
+
+    try:
+        client = ONVIFClient()
+        camera = await client.connect_camera(
+            ip=camera_ip,
+            port=port,
+            username=username,
+            password=password
+        )
+
+        # Get first profile
+        profiles = await client.get_media_profiles(camera)
+        if not profiles:
+            logger.warning("No media profiles found")
+            return None
+
+        profile_token = profiles[0].get("token")
+        if not profile_token:
+            logger.warning("No profile token found")
+            return None
+
+        # Get snapshot URI
+        snapshot_uri = await client.get_snapshot_uri(camera, profile_token)
+
+        if not snapshot_uri:
+            logger.warning("No snapshot URI returned")
+            return None
+
+        logger.info(f"Fetching snapshot from: {snapshot_uri}")
+
+        # Fetch the actual image
+        async with httpx.AsyncClient(verify=False, timeout=15.0) as http_client:
+            # Most cameras require auth for snapshot
+            response = await http_client.get(
+                snapshot_uri,
+                auth=httpx.DigestAuth(username, password)
+            )
+
+            if response.status_code == 200:
+                content_type = response.headers.get("content-type", "image/jpeg")
+                # Normalize content type
+                if "jpeg" in content_type.lower() or "jpg" in content_type.lower():
+                    media_type = "image/jpeg"
+                elif "png" in content_type.lower():
+                    media_type = "image/png"
+                else:
+                    media_type = "image/jpeg"  # Default
+
+                image_base64 = base64.b64encode(response.content).decode("utf-8")
+                return {
+                    "base64": f"data:{media_type};base64,{image_base64}",
+                    "mediaType": media_type,
+                    "size": len(response.content)
+                }
+            else:
+                logger.warning(f"Snapshot request failed: {response.status_code}")
+                return None
+
+    except Exception as e:
+        logger.error(f"Failed to get ONVIF snapshot: {e}", exc_info=True)
+        return None
+
+
+@app.post("/api/camera/{camera_ip}/snapshot")
+async def get_snapshot(
+    camera_ip: str,
+    username: str = "",
+    password: str = "",
+    port: int = 80
+):
+    """
+    Get a snapshot from camera via ONVIF.
+
+    Returns base64-encoded image data.
+    """
+    logger.info(f"Snapshot request for camera {camera_ip}")
+
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+
+    try:
+        snapshot_data = await get_camera_snapshot_onvif(
+            camera_ip=camera_ip,
+            port=port,
+            username=username,
+            password=password
+        )
+
+        if snapshot_data:
+            return {
+                "cameraIp": camera_ip,
+                "snapshot": snapshot_data["base64"],
+                "mediaType": snapshot_data["mediaType"],
+                "size": snapshot_data.get("size")
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to capture snapshot")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Snapshot failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ---- AI Optimizer endpoint ----
 
@@ -405,7 +705,17 @@ async def optimize_camera(req: OptimizeRequest):
 
     except Exception as e:
         logger.error(f"Optimization failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        # Include more detail for debugging
+        error_detail = str(e)
+        if hasattr(e, '__class__'):
+            error_detail = f"{e.__class__.__name__}: {e}"
+        # For Pydantic validation errors, include field info
+        if 'ValidationError' in str(type(e)):
+            try:
+                error_detail = f"Validation error: {e.errors()}"
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=error_detail)
 
 # ---- Apply settings endpoints ----
 

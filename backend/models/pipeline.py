@@ -182,21 +182,28 @@ class CameraCapabilities:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CameraCapabilities":
         """Create CameraCapabilities from dict"""
+        # Helper to get value with fallback for both missing keys and None values
+        def get_val(key1: str, key2: str, default):
+            val = data.get(key1)
+            if val is None:
+                val = data.get(key2)
+            return val if val is not None else default
+
         return cls(
-            camera_id=data.get("cameraId", data.get("camera_id", "unknown")),
-            supported_resolutions=data.get("supportedResolutions", data.get("supported_resolutions", ["1920x1080"])),
-            supported_codecs=data.get("supportedCodecs", data.get("supported_codecs", ["H.264", "H.265"])),
-            max_fps=data.get("maxFps", data.get("max_fps", 30)),
-            min_fps=data.get("minFps", data.get("min_fps", 1)),
-            max_bitrate_mbps=data.get("maxBitrateMbps", data.get("max_bitrate_mbps", 16.0)),
-            min_bitrate_mbps=data.get("minBitrateMbps", data.get("min_bitrate_mbps", 0.5)),
-            wdr_levels=data.get("wdrLevels", data.get("wdr_levels", ["Off", "Low", "Medium", "High"])),
-            ir_modes=data.get("irModes", data.get("ir_modes", ["Off", "Auto", "On"])),
-            has_wdr=data.get("hasWdr", data.get("has_wdr", True)),
-            has_ir=data.get("hasIr", data.get("has_ir", True)),
-            has_lpr_mode=data.get("hasLprMode", data.get("has_lpr_mode", False)),
-            is_ptz=data.get("isPtz", data.get("is_ptz", False)),
-            source=data.get("source", "api"),
+            camera_id=get_val("cameraId", "camera_id", "unknown"),
+            supported_resolutions=get_val("supportedResolutions", "supported_resolutions", ["1920x1080"]),
+            supported_codecs=get_val("supportedCodecs", "supported_codecs", ["H.264", "H.265"]),
+            max_fps=get_val("maxFps", "max_fps", 30),
+            min_fps=get_val("minFps", "min_fps", 1),
+            max_bitrate_mbps=get_val("maxBitrateMbps", "max_bitrate_mbps", 16.0),
+            min_bitrate_mbps=get_val("minBitrateMbps", "min_bitrate_mbps", 0.5),
+            wdr_levels=get_val("wdrLevels", "wdr_levels", ["Off", "Low", "Medium", "High"]),
+            ir_modes=get_val("irModes", "ir_modes", ["Off", "Auto", "On"]),
+            has_wdr=get_val("hasWdr", "has_wdr", True),
+            has_ir=get_val("hasIr", "has_ir", True),
+            has_lpr_mode=get_val("hasLprMode", "has_lpr_mode", False),
+            is_ptz=get_val("isPtz", "is_ptz", False),
+            source=data.get("source") or "api",
         )
 
 

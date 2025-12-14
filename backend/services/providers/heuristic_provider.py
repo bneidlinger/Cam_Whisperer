@@ -443,10 +443,13 @@ class HeuristicOptimizationProvider(OptimizationProvider):
         capabilities: CameraCapabilities,
     ) -> None:
         """Ensure settings don't exceed camera capabilities"""
-        if stream.fps and stream.fps > capabilities.max_fps:
-            stream.fps = capabilities.max_fps
+        # Get max_fps with safe default
+        max_fps = capabilities.max_fps if capabilities.max_fps is not None else 30
 
-        if stream.codec and stream.codec not in capabilities.supported_codecs:
+        if stream.fps and stream.fps > max_fps:
+            stream.fps = max_fps
+
+        if stream.codec and stream.codec not in (capabilities.supported_codecs or []):
             if capabilities.supported_codecs:
                 stream.codec = capabilities.supported_codecs[0]
 

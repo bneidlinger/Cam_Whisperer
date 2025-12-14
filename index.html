@@ -1201,6 +1201,11 @@
             <span class="nav-icon">=</span>
             <span class="nav-label">Calc</span>
           </div>
+          <div class="nav-item" data-section="camerabay">
+            <span class="nav-icon">@</span>
+            <span class="nav-label">Bay</span>
+            <span class="nav-badge" id="bay-badge">0</span>
+          </div>
         </div>
         <div class="sidebar-footer">
           CLAUDE VISION AI
@@ -1775,7 +1780,64 @@
             </div>
           </div>
         </section>
+
+        <!-- ========== CAMERA BAY SECTION ========== -->
+        <section class="section" id="section-camerabay">
+          <div class="panel" style="margin-bottom: 20px;">
+            <div class="panel-header">
+              <div class="panel-title">Camera Bay</div>
+              <div style="font-size: 0.75rem; color: var(--text-dim);">Connected cameras with full details</div>
+            </div>
+            <div class="panel-body">
+              <div id="camera-bay-list">
+                <div class="empty-state">
+                  <div style="font-size: 3rem; margin-bottom: 10px;">@</div>
+                  <div>No cameras connected yet</div>
+                  <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 10px;">
+                    Go to Import > ONVIF Scan and add cameras with credentials
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
+    </div>
+  </div>
+
+  <!-- Credentials Modal -->
+  <div class="modal-overlay" id="credentials-modal">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header">
+        <div class="modal-title">Camera Credentials</div>
+        <button class="modal-close" id="credentials-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="credentials-form">
+          <div id="credentials-camera-info" style="margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border: 1px solid var(--orange-dark); border-radius: 4px;">
+            <!-- Camera info populated by JS -->
+          </div>
+          <div class="form-group">
+            <label>ONVIF Username</label>
+            <input type="text" id="cred-username" placeholder="admin" autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <label>ONVIF Password</label>
+            <input type="password" id="cred-password" placeholder="********" autocomplete="current-password" />
+          </div>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+              <input type="checkbox" id="cred-remember" style="width: auto;" />
+              <span>Remember for this session</span>
+            </label>
+          </div>
+          <div id="credentials-status" style="display: none; margin-bottom: 15px; padding: 10px; border-radius: 4px; font-size: 0.85rem;"></div>
+          <div class="action-bar">
+            <button type="submit" class="btn" id="credentials-connect-btn">Connect & Add</button>
+            <button type="button" class="btn btn-secondary" id="credentials-skip-btn">Skip (Add Basic)</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -2186,6 +2248,9 @@
       // Update health section
       updateHealthSection();
 
+      // Update camera bay
+      updateCameraBay();
+
       // Update inventory count
       document.getElementById('inventory-count').textContent = cameras.length;
     }
@@ -2549,6 +2614,10 @@
       document.querySelectorAll('.onvif-checkbox').forEach(cb => cb.checked = e.target.checked);
     });
 
+    // Queue for adding cameras with credentials
+    let cameraAddQueue = [];
+    let processingQueue = false;
+
     document.getElementById('onvif-import-btn').addEventListener('click', () => {
       const selected = [];
       document.querySelectorAll('.onvif-checkbox:checked').forEach(cb => {
@@ -2566,27 +2635,50 @@
         return;
       }
 
-      let imported = 0;
-      selected.forEach(cam => {
+      // Filter out already-added cameras
+      const toAdd = selected.filter(cam => {
         const id = 'CAM-' + (cam.ip || '').replace(/\./g, '-');
-        if (!getCurrentCameras().find(c => c.id === id)) {
-          const camera = {
-            id: id,
-            ip: cam.ip || cam.address || '',
-            location: '',
-            vendor: cam.vendor || cam.manufacturer || '',
-            model: cam.model || '',
-            source: 'onvif',
-            importedAt: new Date().toISOString()
-          };
-          if (addCameraToCurrentSite(camera)) {
-            imported++;
-          }
-        }
+        return !getCurrentCameras().find(c => c.id === id);
       });
-      showToast(`Imported ${imported} cameras`);
+
+      if (toAdd.length === 0) {
+        showToast('All selected cameras already added');
+        return;
+      }
+
+      // Queue cameras for credential entry
+      cameraAddQueue = toAdd.map(cam => ({
+        id: 'CAM-' + (cam.ip || '').replace(/\./g, '-'),
+        ip: cam.ip || cam.address || '',
+        port: cam.port || 80,
+        vendor: cam.vendor || cam.manufacturer || '',
+        model: cam.model || '',
+        mac: cam.mac || ''
+      }));
+
+      // Start processing queue - show modal for first camera
       document.getElementById('onvif-results').style.display = 'none';
+      processNextCamera();
     });
+
+    function processNextCamera() {
+      if (cameraAddQueue.length === 0) {
+        showToast('All cameras processed');
+        updateCameraBay();
+        return;
+      }
+
+      const camera = cameraAddQueue.shift();
+      showCredentialsModal(camera);
+
+      // Update modal title to show progress if multiple cameras
+      if (cameraAddQueue.length > 0) {
+        document.querySelector('#credentials-modal .modal-title').textContent =
+          `Camera Credentials (${cameraAddQueue.length + 1} remaining)`;
+      } else {
+        document.querySelector('#credentials-modal .modal-title').textContent = 'Camera Credentials';
+      }
+    }
 
     // ---- Camera Import: WAVE ----
     document.getElementById('wave-connect-form').addEventListener('submit', async (e) => {
@@ -2826,6 +2918,385 @@
       }
     }
 
+    // ---- Camera Bay & Credentials ----
+    let pendingCameraAdd = null;  // Camera being added via credentials modal
+    const sessionCredentials = {};  // Cached credentials for session
+
+    // Credentials modal elements
+    const credentialsModal = document.getElementById('credentials-modal');
+    const credentialsForm = document.getElementById('credentials-form');
+    const credentialsStatus = document.getElementById('credentials-status');
+    const credentialsCameraInfo = document.getElementById('credentials-camera-info');
+
+    document.getElementById('credentials-modal-close').addEventListener('click', () => {
+      credentialsModal.classList.remove('active');
+      pendingCameraAdd = null;
+    });
+
+    credentialsModal.addEventListener('click', (e) => {
+      if (e.target === credentialsModal) {
+        credentialsModal.classList.remove('active');
+        pendingCameraAdd = null;
+      }
+    });
+
+    document.getElementById('credentials-skip-btn').addEventListener('click', () => {
+      // Add camera without connecting (basic info only)
+      if (pendingCameraAdd) {
+        const camera = {
+          id: pendingCameraAdd.id || `CAM-${pendingCameraAdd.ip.replace(/\./g, '-')}`,
+          ip: pendingCameraAdd.ip,
+          port: pendingCameraAdd.port || 80,
+          vendor: pendingCameraAdd.vendor || pendingCameraAdd.manufacturer || '',
+          model: pendingCameraAdd.model || '',
+          source: 'onvif',
+          importedAt: new Date().toISOString(),
+          connected: false
+        };
+        if (addCameraToCurrentSite(camera)) {
+          showToast(`Added camera: ${camera.ip} (basic)`);
+        }
+        credentialsModal.classList.remove('active');
+        pendingCameraAdd = null;
+      }
+    });
+
+    credentialsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!pendingCameraAdd) return;
+
+      const username = document.getElementById('cred-username').value.trim();
+      const password = document.getElementById('cred-password').value;
+      const remember = document.getElementById('cred-remember').checked;
+
+      if (!username || !password) {
+        showCredentialsStatus('error', 'Username and password required');
+        return;
+      }
+
+      const btn = document.getElementById('credentials-connect-btn');
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      showCredentialsStatus('info', 'Connecting to camera...');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/camera/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: pendingCameraAdd.ip,
+            port: pendingCameraAdd.port || 80,
+            username: username,
+            password: password
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.connected || result.capabilities) {
+          // Success - build full camera object
+          const camera = {
+            id: pendingCameraAdd.id || `CAM-${pendingCameraAdd.ip.replace(/\./g, '-')}`,
+            ip: pendingCameraAdd.ip,
+            port: pendingCameraAdd.port || 80,
+            vendor: result.deviceInfo?.vendor || pendingCameraAdd.vendor || '',
+            model: result.deviceInfo?.model || pendingCameraAdd.model || '',
+            firmware: result.deviceInfo?.firmware || '',
+            serialNumber: result.deviceInfo?.serialNumber || '',
+            source: 'onvif',
+            importedAt: new Date().toISOString(),
+            connected: true,
+            capabilities: result.capabilities,
+            currentSettings: result.currentSettings,
+            snapshot: result.snapshot,
+            snapshotMediaType: result.snapshotMediaType,
+            profiles: result.profiles
+          };
+
+          // Cache credentials if requested
+          if (remember) {
+            sessionCredentials[pendingCameraAdd.ip] = { username, password };
+          }
+
+          if (addCameraToCurrentSite(camera)) {
+            showToast(`Connected & added: ${camera.ip}`);
+            updateCameraBay();
+          }
+
+          credentialsModal.classList.remove('active');
+          pendingCameraAdd = null;
+        } else {
+          // Partial failure
+          const errors = result.errors?.join(', ') || 'Connection failed';
+          showCredentialsStatus('error', errors);
+        }
+
+      } catch (error) {
+        console.error('Connect error:', error);
+        showCredentialsStatus('error', `Connection failed: ${error.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Connect & Add';
+      }
+    });
+
+    function showCredentialsStatus(type, message) {
+      credentialsStatus.style.display = 'block';
+      credentialsStatus.textContent = message;
+      if (type === 'error') {
+        credentialsStatus.style.background = 'rgba(255, 50, 50, 0.2)';
+        credentialsStatus.style.border = '1px solid #ff5050';
+        credentialsStatus.style.color = '#ff5050';
+      } else if (type === 'success') {
+        credentialsStatus.style.background = 'rgba(0, 255, 65, 0.2)';
+        credentialsStatus.style.border = '1px solid #00ff41';
+        credentialsStatus.style.color = '#00ff41';
+      } else {
+        credentialsStatus.style.background = 'rgba(255, 107, 26, 0.2)';
+        credentialsStatus.style.border = '1px solid var(--orange-primary)';
+        credentialsStatus.style.color = 'var(--orange-primary)';
+      }
+    }
+
+    function showCredentialsModal(camera) {
+      pendingCameraAdd = camera;
+
+      // Pre-fill with cached credentials if available
+      const cached = sessionCredentials[camera.ip];
+      document.getElementById('cred-username').value = cached?.username || 'admin';
+      document.getElementById('cred-password').value = cached?.password || '';
+      document.getElementById('cred-remember').checked = !!cached;
+
+      // Show camera info
+      credentialsCameraInfo.innerHTML = `
+        <div style="display: grid; grid-template-columns: 80px 1fr; gap: 8px; font-size: 0.85rem;">
+          <span style="color: var(--text-dim);">IP:</span>
+          <span style="color: var(--orange-glow);">${escapeHtml(camera.ip)}</span>
+          <span style="color: var(--text-dim);">Vendor:</span>
+          <span>${escapeHtml(camera.vendor || camera.manufacturer || 'Unknown')}</span>
+          <span style="color: var(--text-dim);">Model:</span>
+          <span>${escapeHtml(camera.model || 'Unknown')}</span>
+        </div>
+      `;
+
+      credentialsStatus.style.display = 'none';
+      credentialsModal.classList.add('active');
+    }
+
+    // Continue processing camera queue after skip
+    document.getElementById('credentials-skip-btn').addEventListener('click', () => {
+      setTimeout(processNextCamera, 100);
+    });
+
+    // Continue processing camera queue after successful connect
+    credentialsForm.addEventListener('submit', () => {
+      const checkAndContinue = setInterval(() => {
+        if (!credentialsModal.classList.contains('active')) {
+          clearInterval(checkAndContinue);
+          setTimeout(processNextCamera, 200);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(checkAndContinue), 30000);
+    });
+
+    // Camera Bay display
+    function updateCameraBay() {
+      const cameras = getCurrentCameras().filter(c => c.connected);
+      const bayList = document.getElementById('camera-bay-list');
+      const bayBadge = document.getElementById('bay-badge');
+
+      bayBadge.textContent = cameras.length;
+
+      if (cameras.length === 0) {
+        bayList.innerHTML = `
+          <div class="empty-state">
+            <div style="font-size: 3rem; margin-bottom: 10px;">@</div>
+            <div>No cameras connected yet</div>
+            <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 10px;">
+              Go to Import > ONVIF Scan and add cameras with credentials
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      bayList.innerHTML = cameras.map((cam, idx) => `
+        <div class="camera-bay-card" style="display: grid; grid-template-columns: 200px 1fr; gap: 20px; padding: 20px; margin-bottom: 15px; background: var(--bg-secondary); border: 1px solid var(--orange-dark); border-radius: 4px;">
+          <!-- Snapshot -->
+          <div class="camera-bay-snapshot" style="position: relative;">
+            ${cam.snapshot ? `
+              <img src="${cam.snapshot}" alt="Camera snapshot" style="width: 100%; border-radius: 4px; border: 1px solid var(--border-color);" />
+            ` : `
+              <div style="width: 100%; height: 120px; background: var(--bg-primary); border: 1px dashed var(--border-color); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--text-dim);">
+                No snapshot
+              </div>
+            `}
+            <button onclick="refreshCameraSnapshot('${cam.ip}')" class="btn btn-secondary" style="position: absolute; bottom: 5px; right: 5px; padding: 4px 8px; font-size: 0.7rem;">
+              Refresh
+            </button>
+          </div>
+
+          <!-- Details -->
+          <div class="camera-bay-details">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+              <div>
+                <div style="font-size: 1.1rem; color: var(--orange-glow); font-weight: 600;">${escapeHtml(cam.ip)}</div>
+                <div style="font-size: 0.85rem; color: var(--text-dim);">${escapeHtml(cam.vendor || '')} ${escapeHtml(cam.model || '')}</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="selectCameraForOptimize('${cam.id}')" class="btn" style="padding: 6px 12px; font-size: 0.75rem;">Optimize</button>
+                <button onclick="viewCameraDetails('${cam.id}')" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;">Details</button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+              <!-- Device Info -->
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 8px;">// DEVICE</div>
+                <div style="font-size: 0.8rem; display: grid; gap: 4px;">
+                  <div><span style="color: var(--text-dim);">Firmware:</span> ${escapeHtml(cam.firmware || 'N/A')}</div>
+                  <div><span style="color: var(--text-dim);">Serial:</span> ${escapeHtml(cam.serialNumber || 'N/A')}</div>
+                </div>
+              </div>
+
+              <!-- Capabilities -->
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 8px;">// CAPABILITIES</div>
+                <div style="font-size: 0.8rem; display: grid; gap: 4px;">
+                  ${cam.capabilities ? `
+                    <div><span style="color: var(--text-dim);">Res:</span> ${escapeHtml((cam.capabilities.resolutions || cam.capabilities.supportedResolutions || []).slice(0, 2).join(', ') || 'N/A')}</div>
+                    <div><span style="color: var(--text-dim);">Codecs:</span> ${escapeHtml((cam.capabilities.codecs || cam.capabilities.supportedCodecs || []).join(', ') || 'N/A')}</div>
+                    <div><span style="color: var(--text-dim);">Max FPS:</span> ${cam.capabilities.maxFps || 'N/A'}</div>
+                  ` : '<div style="color: var(--text-dim);">Not queried</div>'}
+                </div>
+              </div>
+
+              <!-- Current Settings -->
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 8px;">// CURRENT</div>
+                <div style="font-size: 0.8rem; display: grid; gap: 4px;">
+                  ${cam.currentSettings?.stream ? `
+                    <div><span style="color: var(--text-dim);">Res:</span> ${escapeHtml(cam.currentSettings.stream.resolution || 'N/A')}</div>
+                    <div><span style="color: var(--text-dim);">Codec:</span> ${escapeHtml(cam.currentSettings.stream.codec || 'N/A')}</div>
+                    <div><span style="color: var(--text-dim);">FPS:</span> ${cam.currentSettings.stream.fps || 'N/A'}</div>
+                  ` : '<div style="color: var(--text-dim);">Not queried</div>'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function refreshCameraSnapshot(cameraIp) {
+      const cam = getCurrentCameras().find(c => c.ip === cameraIp);
+      if (!cam) return;
+
+      const creds = sessionCredentials[cameraIp];
+      if (!creds) {
+        showToast('No credentials cached. Re-add camera with credentials.');
+        return;
+      }
+
+      showToast('Refreshing snapshot...');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/camera/${cameraIp}/snapshot?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&port=${cam.port || 80}`, {
+          method: 'POST'
+        });
+        const result = await response.json();
+
+        if (result.snapshot) {
+          cam.snapshot = result.snapshot;
+          cam.snapshotMediaType = result.mediaType;
+          saveState();
+          updateCameraBay();
+          showToast('Snapshot refreshed');
+        } else {
+          showToast('Failed to get snapshot');
+        }
+      } catch (error) {
+        console.error('Snapshot refresh error:', error);
+        showToast('Snapshot refresh failed');
+      }
+    }
+
+    function selectCameraForOptimize(cameraId) {
+      const cam = getCurrentCameras().find(c => c.id === cameraId);
+      if (!cam) return;
+
+      // Switch to optimize section
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      document.querySelector('[data-section="optimize"]').classList.add('active');
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById('section-optimize').classList.add('active');
+
+      // Select camera in dropdown
+      const select = document.getElementById('optimize-camera-select');
+      for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].value === cameraId) {
+          select.selectedIndex = i;
+          break;
+        }
+      }
+
+      // Pre-fill sample frame if camera has snapshot
+      if (cam.snapshot) {
+        state.sampleFrameBase64 = cam.snapshot;
+        const uploadZone = document.getElementById('sample-upload-zone');
+        if (uploadZone) {
+          uploadZone.innerHTML = `
+            <img src="${cam.snapshot}" style="max-width:100%; max-height:150px; border-radius:4px; margin-bottom:8px;" />
+            <div style="font-size:0.75rem; color:var(--text-dim);">Auto-loaded from camera snapshot</div>
+          `;
+        }
+      }
+    }
+
+    function viewCameraDetails(cameraId) {
+      const cam = getCurrentCameras().find(c => c.id === cameraId);
+      if (!cam) return;
+
+      document.getElementById('modal-title').textContent = `Camera: ${cam.ip}`;
+      document.getElementById('modal-body').innerHTML = `
+        <div style="display: grid; gap: 20px;">
+          ${cam.snapshot ? `
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">// SNAPSHOT</div>
+              <img src="${cam.snapshot}" style="max-width: 100%; border-radius: 4px;" />
+            </div>
+          ` : ''}
+
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">// DEVICE INFO</div>
+            <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; font-size: 0.85rem;">
+              <span style="color: var(--text-dim);">IP:</span><span>${escapeHtml(cam.ip)}</span>
+              <span style="color: var(--text-dim);">Port:</span><span>${cam.port || 80}</span>
+              <span style="color: var(--text-dim);">Vendor:</span><span>${escapeHtml(cam.vendor || 'Unknown')}</span>
+              <span style="color: var(--text-dim);">Model:</span><span>${escapeHtml(cam.model || 'Unknown')}</span>
+              <span style="color: var(--text-dim);">Firmware:</span><span>${escapeHtml(cam.firmware || 'N/A')}</span>
+              <span style="color: var(--text-dim);">Serial:</span><span>${escapeHtml(cam.serialNumber || 'N/A')}</span>
+            </div>
+          </div>
+
+          ${cam.capabilities ? `
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">// CAPABILITIES</div>
+              <pre style="background: var(--bg-primary); padding: 10px; border-radius: 4px; font-size: 0.75rem; overflow: auto; max-height: 200px;">${escapeHtml(JSON.stringify(cam.capabilities, null, 2))}</pre>
+            </div>
+          ` : ''}
+
+          ${cam.currentSettings ? `
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">// CURRENT SETTINGS</div>
+              <pre style="background: var(--bg-primary); padding: 10px; border-radius: 4px; font-size: 0.75rem; overflow: auto; max-height: 200px;">${escapeHtml(JSON.stringify(cam.currentSettings, null, 2))}</pre>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      document.getElementById('detail-modal').classList.add('active');
+    }
+
     // ---- Optimization ----
     const sampleUploadZone = document.getElementById('sample-upload-zone');
     const sampleFileInput = document.getElementById('sample-file-input');
@@ -2871,6 +3342,38 @@
       badge.className = 'status-badge ' + mode;
       text.textContent = message;
     }
+
+    // Auto-fill snapshot when camera is selected from dropdown
+    document.getElementById('optimize-camera-select').addEventListener('change', (e) => {
+      const cameraId = e.target.value;
+      if (!cameraId) {
+        // Clear sample frame when no camera selected
+        state.sampleFrameBase64 = null;
+        document.getElementById('sample-upload-zone').innerHTML = `
+          <div class="upload-icon">IMG</div>
+          <div class="upload-text">Drop camera snapshot or click to browse</div>
+          <input type="file" id="sample-file-input" accept="image/*" style="display: none;" />
+        `;
+        return;
+      }
+
+      const cam = getCurrentCameras().find(c => c.id === cameraId);
+      if (cam && cam.snapshot) {
+        state.sampleFrameBase64 = cam.snapshot;
+        document.getElementById('sample-upload-zone').innerHTML = `
+          <img src="${cam.snapshot}" style="max-width:100%; max-height:150px; border-radius:4px; margin-bottom:8px;" />
+          <div style="font-size:0.75rem; color:var(--text-dim);">Auto-loaded from camera snapshot</div>
+        `;
+      } else {
+        // Camera has no snapshot - show upload zone
+        state.sampleFrameBase64 = null;
+        document.getElementById('sample-upload-zone').innerHTML = `
+          <div class="upload-icon">IMG</div>
+          <div class="upload-text">Drop camera snapshot or click to browse</div>
+          <input type="file" id="sample-file-input" accept="image/*" style="display: none;" />
+        `;
+      }
+    });
 
     document.getElementById('optimize-form').addEventListener('submit', async (e) => {
       e.preventDefault();

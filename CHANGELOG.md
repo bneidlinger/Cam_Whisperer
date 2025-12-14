@@ -11,6 +11,208 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### ONVIF Integration Improvements (Phase 1 & 2)
+
+**Phase 1: Foundation Improvements** ✅
+- **Added** WSDL caching with SQLite (`backend/cache/wsdl_cache.db`)
+  - Reduces camera connection time from ~5s to <500ms
+  - 24-hour cache TTL for parsed WSDL documents
+  - Uses `zeep.cache.SqliteCache`
+
+- **Added** Scope-based WS-Discovery filtering
+  - Filter by location, manufacturer, or custom scopes
+  - Prevents broadcast storms on large networks
+  - Optional `scopes` parameter on discovery
+
+- **Added** Direct connect mode (`ONVIFClient.direct_connect()`)
+  - Bypass WS-Discovery when IP is known
+  - More secure - no unauthenticated UDP broadcast
+  - Returns device info, capabilities, Profile T support status
+
+- **Added** Connection pooling for ONVIF cameras
+  - Reuse authenticated camera connections
+  - `cache_connection()`, `get_cached_connection()`, `remove_cached_connection()`
+  - Reduces repeated authentication overhead
+
+- **Added** Profile T detection
+  - Auto-detect Media2 service availability
+  - Log deprecation warning for Profile S-only cameras
+  - `profile_t_supported` flag in connection results
+
+- **Added** `ONVIFBatchClient` for concurrent camera operations
+  - Query multiple cameras in parallel with `asyncio.gather()`
+  - Batch capabilities, settings, and info queries
+
+**Phase 2: Profile T Migration** ✅
+- **Created** `backend/integrations/media2_client.py` (~250 lines)
+  - `Media2Client` class with Profile S fallback
+  - `has_media2_service()` - Check for Media2 availability
+  - `get_profiles()` - Get media profiles (Media2 or Media1)
+  - `get_video_encoder_configurations()` - Query encoder configs
+  - `get_video_encoder_config_options()` - Query encoder capabilities
+  - `set_video_encoder_configuration()` - Configure encoder
+  - `get_stream_uri()` - Get stream URI with protocol options
+
+- **Added** H.265/HEVC encoder configuration support
+  - `check_h265_support()` - Detect H.265 capability
+  - `configure_h265_stream()` - Configure H.265 encoder
+  - Support for H.265 profiles (Main, Main10)
+  - GOP length and bitrate configuration
+
+- **Added** RTSPS (Secure RTSP) support
+  - `get_stream_uri()` with `secure=True` option
+  - HTTPS/RTSPS protocol selection
+  - TLS-encrypted video streaming
+
+- **Integrated** Media2 client into `ONVIFClient`
+  - `get_h265_capabilities()` - Query H.265 support and options
+  - `configure_h265()` - Apply H.265 encoder settings
+  - `get_stream_uri_secure()` - Get RTSPS URI
+
+- **Updated** Discovery service with H.265 detection
+  - Discovery response includes `h265_supported`, `h265_profiles`, `max_h265_resolution`
+  - Automatic capability detection during camera discovery
+
+### Fixed
+
+- **Fixed** `CameraCapabilities.from_dict()` None value handling
+  - Now properly defaults to safe values when dict contains `null`
+  - Prevents comparison errors (`'>' not supported between int and NoneType`)
+
+- **Fixed** `_clamp_to_capabilities()` in heuristic provider
+  - Added defensive check for `None` max_fps value
+  - Defaults to 30 FPS if capabilities.max_fps is None
+
+- **Fixed** ResourceWarning spam from wsdiscovery library
+  - Added warning filters at module level in `main.py`
+  - Added `PYTHONWARNINGS=ignore::ResourceWarning` in start scripts
+
+- **Fixed** Snapshot not auto-filling in optimize form
+  - Corrected element ID from `camera-select` to `optimize-camera-select`
+  - Added change event listener to populate snapshot from camera
+
+### Documentation
+
+- **Created** `docs/onvif_action_plan.md` - Comprehensive ONVIF integration roadmap
+  - 5 phases of improvements based on ONVIF 2024-2025 specifications
+  - Profile T migration timeline (Profile S deprecated Oct 2025)
+  - WebRTC signaling architecture
+  - MQTT event integration (Profile M)
+  - Security hardening recommendations
+
+---
+
+#### Full Database Persistence (Phase 1 Complete)
+- **Added** SQLAlchemy 2.0 database layer (`backend/database.py`)
+  - SQLite for local dev, PostgreSQL-ready for production
+  - Session context manager with auto-commit/rollback
+  - Database initialization on FastAPI startup
+
+- **Added** ORM models (`backend/models/orm.py`)
+  - `Camera` - Camera inventory with metadata, credentials, capabilities
+  - `Optimization` - Full audit trail of optimization requests/results
+  - `AppliedConfig` - Job tracking for applied settings (replaces in-memory)
+  - `CameraDatasheet` - Manufacturer datasheet cache
+  - `DatasheetFetchLog` - Fetch attempt tracking
+
+- **Added** Camera service (`backend/services/camera_service.py`)
+  - `register_camera()` - Create/update by IP
+  - `get_camera()`, `get_camera_by_ip()` - Retrieve cameras
+  - `list_cameras()` - Query with filters (scene_type, purpose, vendor)
+  - `update_camera()`, `delete_camera()` - CRUD operations
+  - Soft delete support with `deleted_at` timestamp
+
+- **Added** Camera management API endpoints
+  - `GET /api/cameras` - List with filters and pagination
+  - `POST /api/cameras` - Register camera
+  - `GET /api/cameras/{id}` - Get by ID
+  - `PUT /api/cameras/{id}` - Update camera
+  - `DELETE /api/cameras/{id}` - Soft/hard delete
+
+- **Added** Optimization persistence
+  - Auto-saves all optimization results to database
+  - Returns `optimizationId` in API response
+  - `GET /api/optimizations` - Query history with pagination
+  - `GET /api/optimizations/{id}` - Get single result
+  - `GET /api/cameras/{id}/optimizations` - Camera-specific history
+
+- **Added** Apply job persistence
+  - Database-backed job tracking (replaces `self.active_jobs = {}`)
+  - Jobs survive server restarts
+  - `GET /api/apply/jobs` - List with status filters
+  - Backward-compatible with legacy job ID format
+
+- **Added** Auto-registration of discovered cameras
+  - ONVIF-discovered cameras auto-register to database
+  - WAVE VMS-discovered cameras include VMS metadata
+  - `registered: true` flag in discovery response
+
+#### Camera Datasheet Integration
+- **Added** Datasheet fetcher (`backend/integrations/datasheet_fetcher.py`)
+  - DuckDuckGo search for PDF datasheets
+  - Hardcoded manufacturer URL patterns (Axis, Hanwha, Hikvision, Dahua, etc.)
+  - PDF download and text extraction with pdfplumber
+  - Spec parsing (sensor size, resolution, WDR, codecs, IR range)
+
+- **Added** Datasheet service (`backend/services/datasheet_service.py`)
+  - Database caching layer
+  - Background fetch triggering (non-blocking)
+  - `get_datasheet()` - Check cache first
+  - `fetch_and_cache()` - Fetch and persist
+  - `start_background_fetch()` - Async background task
+
+- **Added** Datasheet API endpoints
+  - `GET /api/datasheets/{manufacturer}/{model}` - Get cached datasheet
+  - `POST /api/datasheets/fetch` - Trigger fetch
+  - `POST /api/datasheets/upload` - Manual upload
+  - `DELETE /api/datasheets/{manufacturer}/{model}` - Remove
+  - `GET /api/datasheets` - List all cached
+
+- **Integrated** Datasheet specs into Claude AI prompt
+  - `datasheet_specs` field in OptimizationContext
+  - Manufacturer specifications section in Claude prompt
+  - Auto-fetch triggered on camera discovery
+
+#### Network Security Controls
+- **Added** Rate limiting (`backend/utils/rate_limiter.py`)
+  - 30 second minimum between discovery requests per client
+  - Max 3 requests/minute per client
+  - Global limit: 10 requests/minute across all clients
+  - 5 minute block for repeat offenders
+  - Proper 429 responses with `Retry-After` header
+
+- **Added** MAC/OUI filtering (`backend/utils/network_filter.py`)
+  - MAC address whitelist/blacklist
+  - OUI (vendor prefix) filtering
+  - 35+ known camera manufacturer OUIs (Hanwha, Axis, Hikvision, Dahua, etc.)
+  - IP subnet restrictions (CIDR notation)
+  - Vendor name filtering
+  - Auto-enriches cameras with vendor from MAC lookup
+
+- **Added** Security API endpoints
+  - `GET /api/security/rate-limit/status` - Check rate limit status
+  - `GET /api/security/network-filter` - View filter config
+  - `PUT /api/security/network-filter` - Configure filtering
+  - `GET /api/security/known-ouis` - List known camera OUIs
+
+- **Hardened** Discovery endpoints
+  - Default `max_cameras=100` (was unlimited)
+  - Max timeout enforced at 30 seconds
+  - Rate limit status in discovery responses
+  - Network filter applied post-discovery
+
+### Changed
+- **Updated** Discovery service to apply network filtering
+- **Updated** Apply service to use database-backed job tracking
+- **Updated** Optimization service to persist results automatically
+
+### Security
+- Rate limiting prevents network flooding via discovery abuse
+- MAC filtering restricts discovery to known/trusted devices
+- Subnet filtering enables network segmentation compliance
+
+---
+
 #### Landing Page & Documentation
 - **Added** `landing.html` - GitHub Pages landing/guide page
   - Interactive scenario simulator (Lobby, LPR, Perimeter, Retail)

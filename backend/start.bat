@@ -112,6 +112,9 @@ echo   Close the "CamOpt Frontend" window to stop frontend
 echo  ============================================================
 echo.
 
+REM Suppress ResourceWarning from wsdiscovery library
+set PYTHONWARNINGS=ignore::ResourceWarning
+
 REM Start backend (this blocks until Ctrl+C)
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
