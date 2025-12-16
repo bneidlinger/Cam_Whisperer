@@ -1134,6 +1134,168 @@
     #site-import-input {
       display: none;
     }
+
+    /* ========== MQTT Events Section Styles ========== */
+
+    /* MQTT Status Badge States */
+    #mqtt-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      background: var(--bg-secondary);
+      border: 1px solid var(--text-dim);
+      border-radius: 2px;
+    }
+
+    #mqtt-status-badge.connected {
+      border-color: var(--green-terminal);
+      color: var(--green-terminal);
+    }
+
+    #mqtt-status-badge.connecting {
+      border-color: var(--amber-warning);
+      color: var(--amber-warning);
+    }
+
+    #mqtt-status-badge.disconnected {
+      border-color: var(--text-dim);
+      color: var(--text-dim);
+    }
+
+    #mqtt-status-badge.error {
+      border-color: var(--red-alert);
+      color: var(--red-alert);
+    }
+
+    #mqtt-status-badge .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    #mqtt-status-badge.connected .status-dot {
+      box-shadow: 0 0 6px var(--green-terminal);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* Event Type Badges */
+    .event-type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 2px;
+      background: var(--bg-primary);
+      border: 1px solid var(--orange-dark);
+      color: var(--text-primary);
+    }
+
+    .event-type-badge.event-motion {
+      border-color: var(--blue-info);
+      color: var(--blue-info);
+    }
+
+    .event-type-badge.event-alert {
+      border-color: var(--red-alert);
+      color: var(--red-alert);
+      animation: alertPulse 1s ease-in-out infinite;
+    }
+
+    .event-type-badge.event-crossing {
+      border-color: var(--amber-warning);
+      color: var(--amber-warning);
+    }
+
+    .event-type-badge.event-face {
+      border-color: #a855f7;
+      color: #a855f7;
+    }
+
+    @keyframes alertPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* Event Log Item */
+    .event-log-item {
+      padding: 10px 15px;
+      border-bottom: 1px solid var(--bg-primary);
+      transition: background 0.2s;
+    }
+
+    .event-log-item:hover {
+      background: rgba(255, 107, 26, 0.05);
+    }
+
+    .event-log-item:last-child {
+      border-bottom: none;
+    }
+
+    /* MQTT Camera Item */
+    .mqtt-camera-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--bg-secondary);
+      margin-bottom: 8px;
+      border-radius: 4px;
+    }
+
+    .mqtt-camera-item:hover {
+      border-color: var(--orange-dark);
+    }
+
+    /* TLS/Security Indicators */
+    .tls-valid {
+      color: var(--green-terminal);
+    }
+
+    .tls-warning {
+      color: var(--amber-warning);
+    }
+
+    .tls-invalid {
+      color: var(--red-alert);
+    }
+
+    .discovery-enabled {
+      color: var(--amber-warning);
+    }
+
+    .discovery-disabled {
+      color: var(--green-terminal);
+    }
+
+    /* Security info in camera cards */
+    .security-info {
+      font-size: 0.75rem;
+      display: grid;
+      gap: 4px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--bg-secondary);
+    }
+
+    .security-info-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .security-info-label {
+      color: var(--text-dim);
+    }
+
+    .btn-xs {
+      padding: 3px 8px;
+      font-size: 0.65rem;
+    }
   </style>
 </head>
 <body>
@@ -1196,6 +1358,11 @@
           <div class="nav-item" data-section="health">
             <span class="nav-icon">~</span>
             <span class="nav-label">Health</span>
+          </div>
+          <div class="nav-item" data-section="events">
+            <span class="nav-icon">!</span>
+            <span class="nav-label">Events</span>
+            <span class="nav-badge" id="events-badge">0</span>
           </div>
           <div class="nav-item" data-section="calculator">
             <span class="nav-icon">=</span>
@@ -1654,6 +1821,144 @@
           </div>
         </section>
 
+        <!-- ========== EVENTS SECTION (MQTT) ========== -->
+        <section class="section" id="section-events">
+          <!-- MQTT Broker Connection -->
+          <div class="panel" style="margin-bottom: 20px;">
+            <div class="panel-header">
+              <div class="panel-title">MQTT Event Bridge</div>
+              <div class="status-badge" id="mqtt-status-badge">
+                <span class="status-dot"></span>
+                <span id="mqtt-status-text">Disconnected</span>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="form-section">
+                <div class="section-header">// Broker Connection</div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Broker Host</label>
+                    <input type="text" id="mqtt-host" placeholder="localhost" value="localhost" />
+                  </div>
+                  <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" id="mqtt-port" value="1883" min="1" max="65535" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Username (optional)</label>
+                    <input type="text" id="mqtt-username" placeholder="admin" />
+                  </div>
+                  <div class="form-group">
+                    <label>Password (optional)</label>
+                    <input type="password" id="mqtt-password" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="flex: none;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                      <input type="checkbox" id="mqtt-use-tls" style="width: auto;" />
+                      <span>Use TLS</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="action-bar">
+                  <button type="button" class="btn" id="mqtt-connect-btn">Connect to Broker</button>
+                  <button type="button" class="btn btn-secondary" id="mqtt-disconnect-btn" disabled>Disconnect</button>
+                </div>
+              </div>
+
+              <!-- Statistics -->
+              <div class="form-section" id="mqtt-stats-section" style="display: none; margin-top: 20px;">
+                <div class="section-header">// Statistics</div>
+                <div class="result-grid" style="grid-template-columns: repeat(4, 1fr);">
+                  <div class="result-item">
+                    <div class="result-label">Received</div>
+                    <div class="result-value" id="mqtt-stat-received">0</div>
+                  </div>
+                  <div class="result-item">
+                    <div class="result-label">Processed</div>
+                    <div class="result-value" id="mqtt-stat-processed">0</div>
+                  </div>
+                  <div class="result-item">
+                    <div class="result-label">Dropped</div>
+                    <div class="result-value" id="mqtt-stat-dropped">0</div>
+                  </div>
+                  <div class="result-item">
+                    <div class="result-label">Last Event</div>
+                    <div class="result-value" id="mqtt-stat-last-event" style="font-size: 0.9rem;">--</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Camera MQTT Configuration -->
+          <div class="panel" style="margin-bottom: 20px;">
+            <div class="panel-header">
+              <div class="panel-title">Camera Event Configuration</div>
+            </div>
+            <div class="panel-body">
+              <div class="form-section">
+                <div class="section-header">// Configure Camera MQTT</div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Camera</label>
+                    <select id="mqtt-camera-select">
+                      <option value="">-- Select Camera --</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Topic Prefix (optional)</label>
+                    <input type="text" id="mqtt-topic-prefix" placeholder="platonicam/{camera_ip}" />
+                  </div>
+                </div>
+                <div class="action-bar">
+                  <button type="button" class="btn" id="mqtt-configure-camera-btn" disabled>Configure Camera</button>
+                  <button type="button" class="btn btn-secondary" id="mqtt-remove-camera-btn" disabled>Remove Config</button>
+                </div>
+              </div>
+
+              <!-- Configured Cameras List -->
+              <div class="form-section" id="mqtt-cameras-section" style="display: none; margin-top: 20px;">
+                <div class="section-header">// Configured Cameras</div>
+                <div id="mqtt-cameras-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Event Log -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Real-Time Event Log</div>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="event-filter-type" style="padding: 4px 8px; font-size: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--orange-dark); color: var(--text-primary);">
+                  <option value="">All Events</option>
+                  <option value="motion">Motion</option>
+                  <option value="line">Line Crossing</option>
+                  <option value="intrusion">Intrusion</option>
+                  <option value="tamper">Tampering</option>
+                  <option value="audio">Audio</option>
+                  <option value="face">Face</option>
+                </select>
+                <button type="button" class="btn btn-secondary btn-sm" id="event-clear-btn">Clear</button>
+              </div>
+            </div>
+            <div class="panel-body" style="padding: 0;">
+              <div id="event-log" style="height: 400px; overflow-y: auto; font-size: 0.8rem; background: var(--bg-secondary);">
+                <div class="empty-state" id="event-log-empty">
+                  <div class="empty-state-icon">!</div>
+                  <div class="empty-state-text">No events received</div>
+                  <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">
+                    Connect to MQTT broker and configure cameras to see events
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- ========== CALCULATOR SECTION ========== -->
         <section class="section" id="section-calculator">
           <div class="grid-2">
@@ -1922,6 +2227,33 @@
             <div id="liveview-stats" style="font-size: 0.7rem; color: var(--text-dim);">
               <!-- Stats populated by JS -->
             </div>
+          </div>
+          <!-- Session Management -->
+          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--bg-primary); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.75rem; color: var(--text-dim);">
+              Active Sessions: <span id="webrtc-session-count" style="color: var(--orange-glow);">0</span>
+            </div>
+            <button id="webrtc-sessions-btn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.7rem;">
+              Manage Sessions
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebRTC Sessions Modal -->
+  <div class="modal-overlay" id="webrtc-sessions-modal">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <div class="modal-title">WebRTC Sessions</div>
+        <button class="modal-close" id="webrtc-sessions-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="webrtc-sessions-list">
+          <div class="empty-state" style="padding: 30px;">
+            <div class="empty-state-icon" style="font-size: 2rem;">▶</div>
+            <div class="empty-state-text">No active sessions</div>
           </div>
         </div>
       </div>
@@ -3198,7 +3530,7 @@
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
               <!-- Device Info -->
               <div>
                 <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 8px;">// DEVICE</div>
@@ -3229,6 +3561,35 @@
                     <div><span style="color: var(--text-dim);">Codec:</span> ${escapeHtml(cam.currentSettings.stream.codec || 'N/A')}</div>
                     <div><span style="color: var(--text-dim);">FPS:</span> ${cam.currentSettings.stream.fps || 'N/A'}</div>
                   ` : '<div style="color: var(--text-dim);">Not queried</div>'}
+                </div>
+              </div>
+
+              <!-- Security/TLS -->
+              <div>
+                <div style="font-size: 0.7rem; color: var(--text-dim); margin-bottom: 8px;">// SECURITY</div>
+                <div style="font-size: 0.8rem; display: grid; gap: 4px;">
+                  ${cam.tlsInfo ? `
+                    <div>
+                      <span style="color: var(--text-dim);">TLS:</span>
+                      ${cam.tlsInfo.valid ?
+                        (cam.tlsInfo.self_signed ?
+                          '<span class="tls-warning">Self-signed</span>' :
+                          '<span class="tls-valid">Valid</span>') :
+                        '<span class="tls-invalid">Invalid</span>'}
+                    </div>
+                    ${cam.tlsInfo.issuer ? `<div><span style="color: var(--text-dim);">Issuer:</span> ${escapeHtml(cam.tlsInfo.issuer)}</div>` : ''}
+                    ${cam.tlsInfo.days_until_expiry !== null ? `<div><span style="color: var(--text-dim);">Expires:</span> ${cam.tlsInfo.days_until_expiry}d</div>` : ''}
+                  ` : '<div style="color: var(--text-dim);">Not checked</div>'}
+                  <div style="margin-top: 4px;">
+                    <span style="color: var(--text-dim);">Discovery:</span>
+                    ${cam.discoveryMode === true ? '<span class="tls-warning">Enabled</span>' :
+                      cam.discoveryMode === false ? '<span class="tls-valid">Disabled</span>' :
+                      '<span style="color: var(--text-dim);">Unknown</span>'}
+                  </div>
+                </div>
+                <div style="display: flex; gap: 4px; margin-top: 8px;">
+                  <button onclick="checkCameraTls('${cam.ip}')" class="btn btn-secondary" style="padding: 3px 6px; font-size: 0.65rem;">Check TLS</button>
+                  <button onclick="toggleDiscoveryMode('${cam.ip}')" class="btn btn-secondary" style="padding: 3px 6px; font-size: 0.65rem;">Toggle Disc</button>
                 </div>
               </div>
             </div>
@@ -4161,6 +4522,478 @@
       }, 3000);
     }
 
+    // ========== MQTT Events Functions ==========
+
+    let mqttEventBuffer = [];
+    const MAX_EVENT_BUFFER = 500;
+    let mqttStatusInterval = null;
+
+    // Update MQTT status badge
+    function updateMqttStatus(state, text) {
+      const badge = document.getElementById('mqtt-status-badge');
+      const textEl = document.getElementById('mqtt-status-text');
+
+      badge.className = state; // connected, connecting, disconnected, error
+      textEl.textContent = text;
+    }
+
+    // Connect to MQTT broker
+    async function connectMqttBroker() {
+      const host = document.getElementById('mqtt-host').value || 'localhost';
+      const port = parseInt(document.getElementById('mqtt-port').value) || 1883;
+      const username = document.getElementById('mqtt-username').value;
+      const password = document.getElementById('mqtt-password').value;
+      const useTls = document.getElementById('mqtt-use-tls').checked;
+
+      try {
+        updateMqttStatus('connecting', 'Connecting...');
+        document.getElementById('mqtt-connect-btn').disabled = true;
+
+        const response = await fetch(`${API_BASE}/api/mqtt/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ host, port, username, password, use_tls: useTls })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          updateMqttStatus('connected', 'Connected');
+          document.getElementById('mqtt-connect-btn').disabled = true;
+          document.getElementById('mqtt-disconnect-btn').disabled = false;
+          document.getElementById('mqtt-configure-camera-btn').disabled = false;
+          document.getElementById('mqtt-stats-section').style.display = 'block';
+          startMqttStatusPolling();
+          showToast('Connected to MQTT broker');
+        } else {
+          throw new Error(result.error || 'Connection failed');
+        }
+      } catch (error) {
+        updateMqttStatus('error', 'Failed');
+        document.getElementById('mqtt-connect-btn').disabled = false;
+        showToast('MQTT connection failed: ' + error.message);
+      }
+    }
+
+    // Disconnect from MQTT broker
+    async function disconnectMqttBroker() {
+      try {
+        await fetch(`${API_BASE}/api/mqtt/disconnect`, { method: 'POST' });
+        updateMqttStatus('disconnected', 'Disconnected');
+        document.getElementById('mqtt-connect-btn').disabled = false;
+        document.getElementById('mqtt-disconnect-btn').disabled = true;
+        document.getElementById('mqtt-configure-camera-btn').disabled = true;
+        document.getElementById('mqtt-stats-section').style.display = 'none';
+        stopMqttStatusPolling();
+        showToast('Disconnected from MQTT broker');
+      } catch (error) {
+        showToast('Disconnect failed: ' + error.message);
+      }
+    }
+
+    // Start polling MQTT status
+    function startMqttStatusPolling() {
+      if (mqttStatusInterval) return;
+      mqttStatusInterval = setInterval(fetchMqttStatus, 5000);
+      fetchMqttStatus(); // Initial fetch
+    }
+
+    // Stop polling MQTT status
+    function stopMqttStatusPolling() {
+      if (mqttStatusInterval) {
+        clearInterval(mqttStatusInterval);
+        mqttStatusInterval = null;
+      }
+    }
+
+    // Fetch MQTT status from backend
+    async function fetchMqttStatus() {
+      try {
+        const response = await fetch(`${API_BASE}/api/mqtt/status`);
+        const status = await response.json();
+
+        if (!status.available) {
+          updateMqttStatus('error', 'Unavailable');
+          return;
+        }
+
+        if (status.connected) {
+          updateMqttStatus('connected', 'Connected');
+          document.getElementById('mqtt-stats-section').style.display = 'block';
+        }
+
+        if (status.stats) {
+          document.getElementById('mqtt-stat-received').textContent = status.stats.events_received || 0;
+          document.getElementById('mqtt-stat-processed').textContent = status.stats.events_processed || 0;
+          document.getElementById('mqtt-stat-dropped').textContent = status.stats.events_dropped || 0;
+          document.getElementById('mqtt-stat-last-event').textContent =
+            status.stats.last_event_time ? formatEventTime(status.stats.last_event_time) : '--';
+
+          // Update badge
+          document.getElementById('events-badge').textContent = status.stats.events_received || 0;
+        }
+
+        // Update configured cameras list
+        if (status.cameras && status.cameras.length > 0) {
+          document.getElementById('mqtt-cameras-section').style.display = 'block';
+          updateMqttCamerasList(status.cameras);
+        }
+      } catch (error) {
+        console.error('Failed to fetch MQTT status:', error);
+      }
+    }
+
+    // Format event timestamp
+    function formatEventTime(isoString) {
+      if (!isoString) return '--';
+      const date = new Date(isoString);
+      return date.toLocaleTimeString();
+    }
+
+    // Update MQTT camera selector
+    function updateMqttCameraSelector() {
+      const select = document.getElementById('mqtt-camera-select');
+      if (!select) return;
+
+      const cameras = getCurrentCameras();
+      select.innerHTML = '<option value="">-- Select Camera --</option>' +
+        cameras.map(cam => `<option value="${cam.ip}">${escapeHtml(cam.ip)} - ${escapeHtml(cam.vendor || cam.id || 'Unknown')}</option>`).join('');
+    }
+
+    // Configure camera MQTT
+    async function configureCameraMqtt() {
+      const cameraIp = document.getElementById('mqtt-camera-select').value;
+      const topicPrefix = document.getElementById('mqtt-topic-prefix').value;
+
+      if (!cameraIp) {
+        showToast('Please select a camera');
+        return;
+      }
+
+      const creds = sessionCredentials[cameraIp];
+      if (!creds) {
+        showToast('No credentials cached for this camera. Re-add the camera with credentials.');
+        return;
+      }
+
+      const cam = getCurrentCameras().find(c => c.ip === cameraIp);
+
+      try {
+        document.getElementById('mqtt-configure-camera-btn').disabled = true;
+
+        const response = await fetch(`${API_BASE}/api/mqtt/camera/configure`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            camera_ip: cameraIp,
+            camera_port: cam?.port || 80,
+            username: creds.username,
+            password: creds.password,
+            topic_prefix: topicPrefix || undefined
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(`Configured MQTT for ${cameraIp}`);
+          fetchMqttStatus();
+        } else {
+          showToast(`Configuration failed: ${result.error || 'Unknown error'}`);
+        }
+      } catch (error) {
+        showToast('Failed to configure camera: ' + error.message);
+      } finally {
+        document.getElementById('mqtt-configure-camera-btn').disabled = false;
+      }
+    }
+
+    // Remove camera MQTT configuration
+    async function removeCameraMqtt() {
+      const cameraIp = document.getElementById('mqtt-camera-select').value;
+
+      if (!cameraIp) {
+        showToast('Please select a camera');
+        return;
+      }
+
+      const creds = sessionCredentials[cameraIp];
+      if (!creds) {
+        showToast('No credentials cached for this camera');
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/mqtt/camera/${cameraIp}?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}`,
+          { method: 'DELETE' }
+        );
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(`Removed MQTT config from ${cameraIp}`);
+          fetchMqttStatus();
+        } else {
+          showToast(`Removal failed: ${result.error || 'Unknown error'}`);
+        }
+      } catch (error) {
+        showToast('Failed to remove config: ' + error.message);
+      }
+    }
+
+    // Update MQTT cameras list UI
+    function updateMqttCamerasList(cameras) {
+      const list = document.getElementById('mqtt-cameras-list');
+
+      if (!cameras || cameras.length === 0) {
+        list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.85rem;">No cameras configured</div>';
+        return;
+      }
+
+      list.innerHTML = cameras.map(camId => `
+        <div class="mqtt-camera-item">
+          <span style="color: var(--orange-glow);">${escapeHtml(camId)}</span>
+          <span class="status-badge connected" style="font-size: 0.65rem; padding: 2px 6px;">
+            <span class="status-dot" style="width: 4px; height: 4px;"></span>
+            Publishing
+          </span>
+        </div>
+      `).join('');
+    }
+
+    // Add event to log (for future real-time updates)
+    function addEventToLog(event) {
+      const logEl = document.getElementById('event-log');
+      const emptyEl = document.getElementById('event-log-empty');
+
+      if (emptyEl) emptyEl.style.display = 'none';
+
+      mqttEventBuffer.unshift(event);
+      if (mqttEventBuffer.length > MAX_EVENT_BUFFER) {
+        mqttEventBuffer.pop();
+      }
+
+      renderEventLog();
+    }
+
+    // Render event log with filter
+    function renderEventLog() {
+      const logEl = document.getElementById('event-log');
+      const filterType = document.getElementById('event-filter-type').value;
+
+      const filteredEvents = filterType
+        ? mqttEventBuffer.filter(e => (e.eventType || '').toLowerCase().includes(filterType))
+        : mqttEventBuffer;
+
+      if (filteredEvents.length === 0) {
+        logEl.innerHTML = `
+          <div class="empty-state" style="padding: 40px;">
+            <div class="empty-state-icon">!</div>
+            <div class="empty-state-text">${filterType ? 'No matching events' : 'No events received'}</div>
+          </div>
+        `;
+        return;
+      }
+
+      logEl.innerHTML = filteredEvents.map(event => `
+        <div class="event-log-item">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <span class="event-type-badge ${getEventTypeClass(event.eventType)}">${escapeHtml(event.eventType || 'Unknown')}</span>
+            <span style="color: var(--text-dim); font-size: 0.75rem;">${formatEventTime(event.timestamp)}</span>
+          </div>
+          <div style="font-size: 0.8rem;">
+            <span style="color: var(--orange-glow);">${escapeHtml(event.cameraIp || 'Unknown')}</span>
+            ${event.data ? `<span style="color: var(--text-dim);"> - ${escapeHtml(JSON.stringify(event.data).substring(0, 80))}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Get CSS class for event type
+    function getEventTypeClass(eventType) {
+      if (!eventType) return '';
+      const type = eventType.toLowerCase();
+      if (type.includes('motion')) return 'event-motion';
+      if (type.includes('intrusion') || type.includes('tamper')) return 'event-alert';
+      if (type.includes('line') || type.includes('cross')) return 'event-crossing';
+      if (type.includes('face')) return 'event-face';
+      return '';
+    }
+
+    // Clear event log
+    function clearEventLog() {
+      mqttEventBuffer = [];
+      document.getElementById('event-log').innerHTML = `
+        <div class="empty-state" id="event-log-empty">
+          <div class="empty-state-icon">!</div>
+          <div class="empty-state-text">No events received</div>
+          <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">
+            Connect to MQTT broker and configure cameras to see events
+          </div>
+        </div>
+      `;
+      document.getElementById('events-badge').textContent = '0';
+    }
+
+    // ========== TLS/Security Functions ==========
+
+    // Check camera TLS certificate
+    async function checkCameraTls(cameraIp) {
+      try {
+        showToast(`Checking TLS for ${cameraIp}...`);
+
+        const response = await fetch(`${API_BASE}/api/camera/${cameraIp}/tls-certificate?port=443`);
+        const result = await response.json();
+
+        // Update camera object with TLS info
+        const cameras = getCurrentCameras();
+        const camIndex = cameras.findIndex(c => c.ip === cameraIp);
+        if (camIndex >= 0) {
+          cameras[camIndex].tlsInfo = result;
+          saveState();
+          updateCameraBay();
+        }
+
+        // Show result toast
+        if (result.valid) {
+          const msg = result.self_signed
+            ? `Valid (self-signed), expires in ${result.days_until_expiry || '?'} days`
+            : `Valid, issuer: ${result.issuer || 'Unknown'}`;
+          showToast(msg);
+        } else {
+          showToast(`TLS check failed: ${result.error || 'Invalid certificate'}`);
+        }
+
+        return result;
+      } catch (error) {
+        showToast('TLS check failed: ' + error.message);
+        return null;
+      }
+    }
+
+    // Toggle discovery mode for camera
+    async function toggleDiscoveryMode(cameraIp) {
+      const creds = sessionCredentials[cameraIp];
+      if (!creds) {
+        showToast('No credentials cached. Re-add camera with credentials.');
+        return;
+      }
+
+      const cameras = getCurrentCameras();
+      const cam = cameras.find(c => c.ip === cameraIp);
+      const currentMode = cam?.discoveryMode !== false; // default true (enabled)
+      const newMode = !currentMode;
+
+      try {
+        showToast(`Setting discovery mode to ${newMode ? 'enabled' : 'disabled'}...`);
+
+        const response = await fetch(`${API_BASE}/api/camera/discovery-mode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: cameraIp,
+            port: cam?.port || 80,
+            username: creds.username,
+            password: creds.password,
+            discoverable: newMode
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success !== false) {
+          // Update camera object
+          const camIndex = cameras.findIndex(c => c.ip === cameraIp);
+          if (camIndex >= 0) {
+            cameras[camIndex].discoveryMode = newMode;
+            saveState();
+            updateCameraBay();
+          }
+          showToast(`Discovery ${newMode ? 'enabled' : 'disabled'} for ${cameraIp}`);
+        } else {
+          showToast(`Failed: ${result.error || 'Unknown error'}`);
+        }
+      } catch (error) {
+        showToast('Failed to set discovery mode: ' + error.message);
+      }
+    }
+
+    // ========== WebRTC Session Management ==========
+
+    // Fetch active WebRTC sessions
+    async function fetchWebRtcSessions() {
+      try {
+        const response = await fetch(`${API_BASE}/api/webrtc/sessions`);
+        const data = await response.json();
+
+        const countEl = document.getElementById('webrtc-session-count');
+        if (countEl) {
+          countEl.textContent = data.count || 0;
+        }
+
+        return data.sessions || [];
+      } catch (error) {
+        console.error('Failed to fetch WebRTC sessions:', error);
+        return [];
+      }
+    }
+
+    // Open WebRTC sessions modal
+    async function openWebRtcSessionsModal() {
+      const sessions = await fetchWebRtcSessions();
+      const list = document.getElementById('webrtc-sessions-list');
+
+      if (!sessions || sessions.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state" style="padding: 30px;">
+            <div class="empty-state-icon" style="font-size: 2rem;">▶</div>
+            <div class="empty-state-text">No active sessions</div>
+          </div>
+        `;
+      } else {
+        list.innerHTML = sessions.map(session => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-secondary); margin-bottom: 8px; border: 1px solid var(--orange-dark); border-radius: 4px;">
+            <div>
+              <div style="color: var(--orange-glow); font-size: 0.9rem;">${escapeHtml(session.cameraIp || 'Unknown')}</div>
+              <div style="font-size: 0.75rem; color: var(--text-dim);">
+                Session: ${escapeHtml((session.sessionId || '').substring(0, 8))}... |
+                State: ${escapeHtml(session.state || 'unknown')}
+              </div>
+            </div>
+            <button onclick="closeWebRtcSession('${escapeHtml(session.sessionId)}')" class="btn btn-secondary btn-xs" style="background: var(--red-alert); border-color: var(--red-alert);">
+              Close
+            </button>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('webrtc-sessions-modal').classList.add('active');
+    }
+
+    // Close WebRTC session
+    async function closeWebRtcSession(sessionId) {
+      try {
+        const response = await fetch(`${API_BASE}/api/webrtc/sessions/${sessionId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          showToast('Session closed');
+          openWebRtcSessionsModal(); // Refresh list
+        } else {
+          showToast('Failed to close session');
+        }
+      } catch (error) {
+        showToast('Error closing session: ' + error.message);
+      }
+    }
+
+    // Close WebRTC sessions modal
+    function closeWebRtcSessionsModal() {
+      document.getElementById('webrtc-sessions-modal').classList.remove('active');
+    }
+
     // ---- Site Event Listeners ----
     document.getElementById('site-selector').addEventListener('change', (e) => {
       switchToSite(e.target.value || null);
@@ -4654,6 +5487,26 @@
       if (activeLiveView) {
         activeLiveView.toggleFullscreen();
       }
+    });
+
+    // ---- MQTT Event Listeners ----
+    document.getElementById('mqtt-connect-btn').addEventListener('click', connectMqttBroker);
+    document.getElementById('mqtt-disconnect-btn').addEventListener('click', disconnectMqttBroker);
+    document.getElementById('mqtt-configure-camera-btn').addEventListener('click', configureCameraMqtt);
+    document.getElementById('mqtt-remove-camera-btn').addEventListener('click', removeCameraMqtt);
+    document.getElementById('event-filter-type').addEventListener('change', renderEventLog);
+    document.getElementById('event-clear-btn').addEventListener('click', clearEventLog);
+
+    // Update MQTT camera selector when section is shown
+    document.querySelector('.nav-item[data-section="events"]').addEventListener('click', () => {
+      updateMqttCameraSelector();
+    });
+
+    // ---- WebRTC Sessions Event Listeners ----
+    document.getElementById('webrtc-sessions-btn')?.addEventListener('click', openWebRtcSessionsModal);
+    document.getElementById('webrtc-sessions-close')?.addEventListener('click', closeWebRtcSessionsModal);
+    document.getElementById('webrtc-sessions-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'webrtc-sessions-modal') closeWebRtcSessionsModal();
     });
 
     // ---- Initialize ----

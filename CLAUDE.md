@@ -4,21 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**PlatoniCam** (v0.4.0) is a camera settings optimization system for surveillance/VMS deployments. It generates optimal camera configurations based on scene type, lighting, and operational requirements using Claude Vision AI with heuristic fallback.
+**PlatoniCam** is a camera settings optimization system for surveillance/VMS deployments. It generates optimal camera configurations based on scene type, lighting, and operational requirements using Claude Vision AI with heuristic fallback.
 
 **License:** Dual-licensed under AGPL v3 (open source) and Commercial (see `COMMERCIAL.md`).
 
 ## Architecture
 
 ```
-┌─────────────────────┐     ┌─────────────────────────────────┐
-│  Frontend (Static)  │────▶│  Backend (FastAPI + Python)     │
-│  index.html         │     │  backend/main.py                │
-│  - Form UI          │     │  - Claude Vision AI integration │
-│  - Results display  │     │  - ONVIF camera discovery       │
-│  - Retro aesthetic  │     │  - Heuristic fallback engine    │
-└─────────────────────┘     │  - Hanwha WAVE VMS support      │
-                            └─────────────────────────────────┘
+┌─────────────────────┐     ┌─────────────────────────────────────────┐
+│  Frontend (Static)  │────▶│  Backend (FastAPI + Python 3.10+)       │
+│  index.html         │     │  backend/main.py                        │
+│  - Form UI          │     │  ┌─────────────────────────────────────┐│
+│  - Results display  │     │  │ Services                            ││
+│  - Sites system     │     │  │  - optimization.py (orchestration)  ││
+│  - Retro aesthetic  │     │  │  - discovery.py (ONVIF/WAVE)        ││
+└─────────────────────┘     │  │  - apply.py (settings application)  ││
+                            │  │  - providers/ (AI + heuristic)      ││
+                            │  └─────────────────────────────────────┘│
+                            │  ┌─────────────────────────────────────┐│
+                            │  │ Integrations                        ││
+                            │  │  - claude_client.py (Claude Vision) ││
+                            │  │  - onvif_client.py (ONVIF protocol) ││
+                            │  │  - webrtc_signaling.py (live view)  ││
+                            │  │  - hanwha_wave_client.py (WAVE VMS) ││
+                            │  └─────────────────────────────────────┘│
+                            │  ┌─────────────────────────────────────┐│
+                            │  │ Persistence (SQLite via SQLAlchemy) ││
+                            │  │  - cameras, optimizations, jobs     ││
+                            │  └─────────────────────────────────────┘│
+                            └─────────────────────────────────────────┘
 ```
 
 ### Frontend
@@ -26,28 +40,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Deployed via GitHub Pages at https://bneidlinger.github.io/cam_whisperer/
 - Contains fallback heuristic engine (`basicHeuristicEngine` function)
 - **Sites/Projects system** for organizing cameras (localStorage + JSON export/import)
-- Retro 80's industrial security aesthetic with CRT effects
 
 ### Backend (`backend/`)
-- **Framework**: FastAPI (Python 3.10+)
-- **AI**: Anthropic Claude Vision (`claude-sonnet-4-5-20250929`)
-- **Camera Integration**: ONVIF protocol, Hanwha WAVE VMS API
-
-Key backend files:
+Key files:
 - `main.py` - FastAPI app, all API endpoints
 - `config.py` - Pydantic settings from `.env`
-- `models/pipeline.py` - Pydantic data models, enums (SceneType, CameraPurpose, etc.)
+- `database.py` - SQLAlchemy engine and session management
 - `errors.py` - Exception hierarchy with recovery hints
+- `models/pipeline.py` - Pydantic API models, enums (SceneType, CameraPurpose, etc.)
+- `models/orm.py` - SQLAlchemy ORM models (Camera, Optimization, AppliedConfig, CameraDatasheet)
 - `services/optimization.py` - Optimization orchestration
-- `services/discovery.py` - ONVIF and WAVE camera discovery
+- `services/discovery.py` - ONVIF WS-Discovery and WAVE camera discovery
 - `services/apply.py` - Apply settings via ONVIF/VMS
-- `services/providers/` - Provider abstraction layer:
-  - `base.py` - `OptimizationProvider` ABC
-  - `claude_provider.py` - Claude AI provider
-  - `heuristic_provider.py` - Rule-based fallback
-  - `factory.py` - Provider factory pattern
+- `services/providers/base.py` - `OptimizationProvider` ABC
+- `services/providers/claude_provider.py` - Claude AI provider
+- `services/providers/heuristic_provider.py` - Rule-based fallback
 - `integrations/claude_client.py` - Anthropic Claude API wrapper
-- `integrations/onvif_client.py` - ONVIF camera protocol client
+- `integrations/onvif_client.py` - ONVIF camera protocol client (Profile S/T)
+- `integrations/media2_client.py` - ONVIF Media2 service for Profile T
+- `integrations/webrtc_signaling.py` - WebRTC signaling gateway for low-latency streaming
 - `integrations/hanwha_wave_client.py` - Hanwha WAVE VMS API client
 
 ## Development Commands
@@ -102,58 +113,13 @@ ruff check .   # Lint
 mypy .         # Type checking (optional)
 ```
 
-### Deployment
-Frontend: Push to `main` branch (GitHub Pages auto-deploys)
-Backend: See `backend/README.md` for Render/Railway deployment
+API docs available at `http://localhost:8000/docs` (Swagger UI) when backend is running.
 
-## API Endpoints
+## Frontend Sites System
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check |
-| `/api/optimize` | POST | Generate optimal settings (AI + fallback) |
-| `/api/discover` | GET | ONVIF camera discovery (WS-Discovery) |
-| `/api/cameras/{id}/capabilities` | GET | Query camera capabilities via ONVIF |
-| `/api/cameras/{id}/current-settings` | GET | Query current settings via ONVIF |
-| `/api/apply` | POST | Apply settings via ONVIF/VMS |
-| `/api/apply/status/{job_id}` | GET | Check apply job status |
-| `/api/wave/discover` | GET | Hanwha WAVE VMS camera discovery |
-| `/api/wave/cameras/{id}/capabilities` | GET | Query capabilities via WAVE |
-| `/api/wave/cameras/{id}/current-settings` | GET | Query current settings via WAVE |
-| `/api/providers` | GET | List available optimization providers |
+The frontend organizes cameras into **Sites**. State is in `state.sites[]` and `state.currentSiteId`. All camera/optimization access must use helper functions (not direct `state.cameras`). Data persists to localStorage key `platonicam_state`.
 
-API docs: `http://localhost:8000/docs` (Swagger UI)
-
-## Sites/Projects System
-
-The frontend organizes cameras into **Sites** (projects/groups). Each site contains its own cameras, optimizations, and health schedules.
-
-### Site Data Model (localStorage)
-```javascript
-{
-  id: "uuid",
-  name: "Site Name",
-  description: "Optional",
-  createdAt: "ISO8601",
-  updatedAt: "ISO8601",
-  cameras: [...],
-  optimizations: [...],
-  healthSchedules: [...]
-}
-```
-
-### Key Functions (in `index.html`)
-- `getCurrentSite()` - Returns active site object
-- `getCurrentCameras()` - Returns cameras for active site
-- `addCameraToCurrentSite(camera)` - Adds camera with validation
-- `createSite(name, description)` - Creates new site
-- `exportCurrentSite()` - Downloads site as JSON
-- `importSiteFromFile(file)` - Loads site from JSON
-
-### Adding Site Features
-1. Site state is in `state.sites[]` and `state.currentSiteId`
-2. All camera/optimization access must use helper functions (not direct `state.cameras`)
-3. Site data persists to localStorage key `platonicam_state`
+Key functions: `getCurrentSite()`, `getCurrentCameras()`, `addCameraToCurrentSite(camera)`, `createSite(name, description)`, `exportCurrentSite()`, `importSiteFromFile(file)`
 
 ## Code Modification Guidelines
 
@@ -193,12 +159,17 @@ Optional (with defaults):
 ```
 APP_ENV=development
 CLAUDE_MODEL=claude-sonnet-4-5-20250929
-FALLBACK_TO_HEURISTIC=true         # Fall back to heuristic if AI fails
+FALLBACK_TO_HEURISTIC=true
 DATABASE_URL=sqlite:///./platonicam.db
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,file://
 ONVIF_TIMEOUT_SECONDS=10
 AI_OPTIMIZATION_TIMEOUT_SECONDS=30
 LOG_LEVEL=INFO
+
+# WebRTC (Phase 3)
+WEBRTC_ENABLED=true
+TURN_SERVER_URL=                    # Optional TURN for NAT traversal
+STUN_SERVER_URLS=stun:stun.l.google.com:19302
 ```
 
 ## Error Handling
@@ -229,6 +200,16 @@ OFFLINE            # Works without internet (heuristic only)
 
 **Fallback behavior**: Claude AI → retry once on transient errors → heuristic engine
 
+## Database Schema
+
+SQLAlchemy ORM models in `models/orm.py`:
+- **Camera** - Registered camera inventory with credentials and capabilities
+- **Optimization** - Audit trail of all optimization runs
+- **AppliedConfig** - Applied configuration job tracking
+- **CameraDatasheet** - Manufacturer specs fetched from datasheets
+
+Database initialized via `init_db()` in `database.py` on startup.
+
 ## Domain Context
 
 ### Camera Settings
@@ -243,3 +224,12 @@ OFFLINE            # Works without internet (heuristic only)
 2. Motion clarity vs low-light (shutter speed)
 3. Bandwidth vs retention
 4. Detail vs coverage (FPS, resolution)
+
+## ONVIF Integration
+
+The backend supports ONVIF Profile S (streaming) and Profile T (advanced streaming):
+- `onvif_client.py` handles device discovery, PTZ, and imaging services
+- `media2_client.py` provides Media2 service for Profile T cameras
+- `webrtc_signaling.py` proxies WebRTC signaling (JSON-RPC 2.0) between browsers and cameras
+
+WebRTC architecture: Browser ↔ WebSocket ↔ Backend Gateway ↔ Camera, then direct SRTP P2P or TURN relay for media.

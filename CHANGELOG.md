@@ -11,6 +11,134 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### ONVIF WebRTC Low-Latency Streaming (Phase 3) ✅
+
+- **Created** `backend/integrations/webrtc_signaling.py` (~550 lines)
+  - `ONVIFWebRTCGateway` class with JSON-RPC 2.0 signaling
+  - WebSocket proxy between browser and camera
+  - SDP offer/answer exchange with ICE candidate forwarding
+  - RTSP fallback for non-WebRTC cameras
+  - Session management with state tracking
+  - Heartbeat mechanism for connection health
+
+- **Added** WebRTC configuration settings (`backend/config.py`)
+  - `webrtc_stun_server` - STUN server URL
+  - `webrtc_turn_server` - TURN server URL
+  - `webrtc_turn_username` / `webrtc_turn_credential` - TURN auth
+
+- **Added** WebRTC API endpoints
+  - `WS /api/webrtc/stream` - WebSocket signaling endpoint
+  - `GET /api/webrtc/config` - Get WebRTC/ICE configuration
+  - `GET /api/webrtc/sessions` - List active streaming sessions
+
+#### ONVIF Profile M Analytics Integration (Phase 4) ✅
+
+- **Created** `backend/integrations/mqtt_events.py` (~450 lines)
+  - `ONVIFEventBridge` class for MQTT pub/sub
+  - `MQTTBrokerConfig` dataclass with connection settings
+  - `CameraEvent` dataclass with EventType enum
+  - Camera MQTT configuration via ONVIF AddEventBroker
+  - Event subscription with handler registration
+  - Connection status tracking and auto-reconnect
+  - Statistics: events received, published, errors
+
+- **Created** `backend/integrations/metadata_parser.py` (~400 lines)
+  - `MetadataParser` for XML and JSON analytics frames
+  - `BoundingBox` with normalized coordinates (0.0-1.0)
+  - `DetectedObject` with classification and confidence
+  - `MotionRegion` for motion detection data
+  - `AnalyticsFrame` aggregating all detections
+  - `ObjectClass` enum: Human, Face, Vehicle, LicensePlate, Animal, etc.
+  - RTP payload parsing support (bytes input)
+
+- **Added** MQTT configuration settings (`backend/config.py`)
+  - `mqtt_enabled` - Enable/disable MQTT integration
+  - `mqtt_broker_host` / `mqtt_broker_port` - Broker connection
+  - `mqtt_use_tls` - TLS encryption for MQTT
+  - `mqtt_username` / `mqtt_password` - Broker authentication
+  - `mqtt_topic_prefix` - Topic namespace (default: "platonicam")
+
+- **Added** MQTT API endpoints
+  - `GET /api/mqtt/status` - Bridge status and statistics
+  - `POST /api/mqtt/connect` - Connect to MQTT broker
+  - `POST /api/mqtt/disconnect` - Disconnect from broker
+  - `POST /api/mqtt/camera/configure` - Configure camera MQTT publishing
+  - `DELETE /api/mqtt/camera/{ip}` - Remove camera MQTT config
+  - `POST /api/mqtt/subscribe` - Subscribe to camera events
+
+#### ONVIF Security Hardening (Phase 5) ✅
+
+- **Created** `backend/utils/tls_helper.py` (~250 lines)
+  - `create_ssl_context()` - Configurable SSL context creation
+  - Support for strict verification or self-signed certificates
+  - Client certificate support for mutual TLS
+  - Secure protocol options (TLS 1.2+ only)
+  - `get_default_ssl_context()` - Uses application settings
+  - `validate_camera_certificate()` - Check camera TLS cert details
+
+- **Added** TLS configuration settings (`backend/config.py`)
+  - `tls_verify_certificates` - Enable strict cert validation
+  - `tls_allow_self_signed` - Allow self-signed certs (default: True)
+  - `tls_ca_bundle_path` - Custom CA bundle path
+  - `tls_client_cert_path` / `tls_client_key_path` - Client cert for mTLS
+
+- **Added** WS-Discovery mode control (`backend/integrations/onvif_client.py`)
+  - `get_discovery_mode()` - Query camera discovery visibility
+  - `set_discovery_mode()` - Enable/disable discoverability
+  - `disable_discovery()` / `enable_discovery()` - Convenience methods
+
+- **Added** Security API endpoints
+  - `GET /api/camera/{ip}/discovery-mode` - Get discovery mode
+  - `POST /api/camera/discovery-mode` - Set discovery mode
+  - `GET /api/camera/{ip}/tls-certificate` - Validate TLS certificate
+
+#### Phase 4/5 Test Suite
+
+- **Created** `tests/backend/test_tls_helper.py` - TLS helper tests (11 tests)
+- **Created** `tests/backend/test_security.py` - Security integration tests (19 tests)
+- **Created** `tests/backend/test_mqtt_events.py` - MQTT event bridge tests (14 tests)
+- **Created** `tests/backend/test_metadata_parser.py` - Metadata parser tests (24 tests)
+
+**Test Results:** 56 passed, 1 skipped
+
+#### Frontend Integration (Phase 3-5 UI) ✅
+
+- **Added** MQTT Events navigation and section (`index.html`)
+  - New "Events" nav item with unread badge counter
+  - MQTT broker connection panel (host, port, username, password, TLS)
+  - Connect/Disconnect controls with status indicator
+  - Real-time statistics (events received, processed, dropped)
+  - Camera MQTT configuration (select camera, topic prefix, enable/disable)
+  - Event log with filtering by type (All, Motion, Alert, Tamper, Analytics)
+  - Auto-refresh polling for broker status and events
+
+- **Added** TLS/Security info to Camera Bay cards
+  - 4-column grid: Device, Capabilities, Current, **Security**
+  - TLS status indicator (Valid/Self-signed/Invalid) with color coding
+  - Certificate issuer and days until expiry display
+  - Discovery mode status (Enabled/Disabled/Unknown)
+  - "Check TLS" button to validate camera certificate
+  - "Toggle Disc" button to enable/disable WS-Discovery visibility
+
+- **Added** WebRTC session management UI
+  - Session count display in liveview modal
+  - "Manage Sessions" button opens session list modal
+  - Active sessions list with camera IP, state, and close button
+  - WebRTC sessions modal with backdrop close support
+
+- **Added** CSS styles (~160 lines)
+  - MQTT status badge states (connected/connecting/disconnected)
+  - Event type badges (motion, alert, tamper, analytics, line_crossing, intrusion)
+  - TLS indicator classes (tls-valid, tls-warning, tls-invalid)
+  - Alert pulse animation for critical events
+
+- **Added** JavaScript functions (~470 lines)
+  - MQTT: `connectMqttBroker()`, `disconnectMqttBroker()`, `fetchMqttStatus()`, `configureCameraMqtt()`, `removeCameraMqtt()`, `updateMqttCameraSelector()`, `addEventToLog()`, `renderEventLog()`, `clearEventLog()`
+  - TLS: `checkCameraTls()`, `toggleDiscoveryMode()`
+  - WebRTC: `fetchWebRtcSessions()`, `openWebRtcSessionsModal()`, `closeWebRtcSession()`, `closeWebRtcSessionsModal()`
+
+**Frontend Total:** ~630 lines added to `index.html`
+
 #### ONVIF Integration Improvements (Phase 1 & 2)
 
 **Phase 1: Foundation Improvements** ✅
@@ -846,7 +974,8 @@ None - First alpha release
 
 ## Version History
 
-- **v0.4.0** (2025-12-07) - Optimization Pipeline Infrastructure [Current]
+- **v0.5.0** (Unreleased) - ONVIF Phases 3-5: WebRTC, Profile M, Security
+- **v0.4.0** (2025-12-07) - Optimization Pipeline Infrastructure
 - **v0.3.2** (2025-12-07) - Rebrand to PlatoniCam + Project Organization
 - **v0.3.1** (2025-12-07) - Sites/Projects + Dual Licensing
 - **v0.3.0** (2025-12-06) - Hanwha WAVE VMS Integration
@@ -899,5 +1028,5 @@ None - First alpha release
 ---
 
 **Maintained by:** PlatoniCam Development Team
-**Last Updated:** 2025-12-07
-**Current Version:** 0.4.0
+**Last Updated:** 2025-12-16
+**Current Version:** 0.5.0-dev (Unreleased)

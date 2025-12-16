@@ -463,9 +463,11 @@ def create_secure_context() -> ssl.SSLContext:
 | 2.3 | RTSPS support | High | 2 days | ✅ DONE |
 | 3.1 | WebRTC signaling | Medium | 1 week | ✅ DONE |
 | 3.2 | TURN integration | Medium | 3 days | ✅ DONE |
-| 4.1 | MQTT events | Medium | 1 week | ⏳ NOT STARTED |
-| 4.2 | Metadata parsing | Low | 3 days | ⏳ NOT STARTED |
-| 5.x | Security hardening | Ongoing | Continuous | 🔄 PARTIAL |
+| 4.1 | MQTT events | Medium | 1 week | ✅ DONE |
+| 4.2 | Metadata parsing | Low | 3 days | ✅ DONE |
+| 5.1 | TLS certificate validation | High | 1 day | ✅ DONE |
+| 5.2 | WS-Discovery disable | Medium | 1 day | ✅ DONE |
+| 5.3 | Media signing verification | Low | Future | ⏳ NOT STARTED |
 
 ### Implementation Notes
 
@@ -490,10 +492,33 @@ def create_secure_context() -> ssl.SSLContext:
 - Added WebSocket endpoint `/api/webrtc/stream`
 - Added REST endpoints: `/api/webrtc/config`, `/api/webrtc/sessions`
 
-**Phase 5 (Partial):**
-- ResourceWarning suppression added
-- TLS certificate validation not yet implemented
-- WS-Discovery disable option not yet added
+**Phase 4 (Completed 2025-12-14):**
+- Created `backend/integrations/mqtt_events.py` (~450 lines)
+- ONVIFEventBridge class for MQTT pub/sub
+- MQTTBrokerConfig for broker settings
+- CameraEvent dataclass with typing
+- Camera MQTT configuration via ONVIF AddEventBroker
+- Event subscription and handler registration
+- Created `backend/integrations/metadata_parser.py` (~400 lines)
+- MetadataParser for XML and JSON analytics frames
+- BoundingBox normalized coordinates (0.0-1.0)
+- DetectedObject with classification and confidence
+- ObjectClass enum (Human, Face, Vehicle, etc.)
+- RTP payload parsing support
+- Added MQTT config settings to config.py
+- Added REST endpoints: `/api/mqtt/status`, `/api/mqtt/connect`, `/api/mqtt/disconnect`
+- Added camera config endpoints: `/api/mqtt/camera/configure`, `/api/mqtt/camera/{ip}`
+
+**Phase 5 (Completed 2025-12-14):**
+- Created `backend/utils/tls_helper.py` for SSL context management
+- TLS certificate validation with configurable strictness
+- Support for self-signed certificates (common in cameras)
+- Client certificate support for mutual TLS
+- Certificate validation endpoint `/api/camera/{ip}/tls-certificate`
+- WS-Discovery mode control via ONVIF SetDiscoveryMode
+- Get/set discovery mode methods in ONVIFClient
+- Security endpoints: `/api/camera/{ip}/discovery-mode`, `/api/camera/discovery-mode`
+- ResourceWarning suppression retained from earlier
 
 ---
 
@@ -504,18 +529,19 @@ def create_secure_context() -> ssl.SSLContext:
 |------|---------|--------|
 | `backend/integrations/media2_client.py` | Profile T Media2 service | ✅ CREATED |
 | `backend/integrations/webrtc_signaling.py` | WebRTC gateway | ✅ CREATED |
-| `backend/integrations/mqtt_events.py` | MQTT event bridge | ⏳ TODO |
-| `backend/integrations/metadata_parser.py` | Analytics metadata | ⏳ TODO |
+| `backend/integrations/mqtt_events.py` | MQTT event bridge (Profile M) | ✅ CREATED |
+| `backend/integrations/metadata_parser.py` | Analytics metadata parsing | ✅ CREATED |
+| `backend/utils/tls_helper.py` | TLS/SSL configuration | ✅ CREATED |
 
 ### Modified Files:
 | File | Changes | Status |
 |------|---------|--------|
-| `backend/integrations/onvif_client.py` | Caching, async, Profile T, H.265, RTSPS | ✅ DONE |
+| `backend/integrations/onvif_client.py` | Caching, async, Profile T, H.265, RTSPS, TLS, Discovery mode | ✅ DONE |
 | `backend/services/discovery.py` | Scope filtering, direct connect, H.265 detection | ✅ DONE |
-| `backend/main.py` | Warning suppression | ✅ DONE |
+| `backend/main.py` | Warning suppression, WebRTC endpoints, MQTT endpoints, Security endpoints | ✅ DONE |
 | `backend/start.bat` | PYTHONWARNINGS env var | ✅ DONE |
 | `backend/start.ps1` | PYTHONWARNINGS env var | ✅ DONE |
-| `backend/config.py` | WebRTC/TURN config (MQTT TODO) | ✅ WebRTC DONE |
+| `backend/config.py` | WebRTC/TURN config, MQTT config, TLS config | ✅ DONE |
 
 ---
 

@@ -205,33 +205,40 @@ STEP 5: Track Results (Optional)
 ├─────────────────────────────────────────────────────────────┤
 │  Framework:     FastAPI (async REST API)                     │
 │  AI Provider:   Anthropic Python SDK                         │
+│  Database:      SQLite via SQLAlchemy 2.0                    │
 │  Config:        Pydantic Settings + .env                     │
-│  Image Support: Base64 encoding for Vision API               │
+│  Camera Proto:  ONVIF Profile S/T, Hanwha WAVE API           │
+│  Streaming:     WebRTC signaling gateway                     │
 │  CORS:          Configured for localhost + file://           │
-│  Tracking:      JSON logs + Markdown reports                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## CURRENT CAPABILITIES (v0.2)
+## CURRENT CAPABILITIES
 
 ```
 [✓] CLAUDE VISION AI INTEGRATION
     └── Real-time analysis of deployment context and sample frames
 
-[✓] BACKEND API SERVER
-    └── FastAPI with async optimization endpoint
+[✓] ONVIF CAMERA DISCOVERY
+    └── WS-Discovery with Profile S and Profile T support
 
-[✓] IMAGE ANALYSIS
-    └── Base64 sample frame upload processed by Claude Vision
+[✓] ONVIF SETTINGS APPLICATION
+    └── Apply optimized settings directly to cameras via ONVIF
+
+[✓] WEBRTC LOW-LATENCY STREAMING
+    └── Live camera preview via WebRTC signaling gateway
+
+[✓] HANWHA WAVE VMS INTEGRATION
+    └── Discover and configure cameras through WAVE VMS API
+
+[✓] DATABASE PERSISTENCE
+    └── SQLite storage for cameras, optimizations, and job history
 
 [✓] HEURISTIC FALLBACK
     └── Automatic degradation to rule-based engine if AI unavailable
 
-[✓] TEST TRACKING SYSTEM
-    └── Logs all optimization requests with confidence scores
-
-[✓] RETRO INDUSTRIAL UI
-    └── 80's security aesthetic with CRT effects and terminal output
+[✓] SITES/PROJECTS SYSTEM
+    └── Organize cameras by site with JSON export/import
 ```
 
 ## REMAINING LIMITATIONS
@@ -240,35 +247,31 @@ STEP 5: Track Results (Optional)
 [!] TESTING PHASE
     └── System under active testing, not production-ready
 
-[!] NO DIRECT VMS INTEGRATION
-    └── Settings must be manually applied to cameras
+[!] LIMITED VMS COVERAGE
+    └── Only Hanwha WAVE has direct API integration currently
 
 [!] NO STORAGE CALCULATOR
     └── Retention targets noted but not validated against capacity
-
-[!] NO CAMERA DISCOVERY
-    └── Manual input of camera context required
 ```
 
 ## ROADMAP
 
 ```
-PHASE 2: ✓ COMPLETED (v0.2)
+PHASE 2: ✓ COMPLETED
          ✓ Claude Vision AI integration
          ✓ Backend API server
          ✓ Sample frame analysis
-         ✓ Test tracking system
 
-PHASE 3: IN PROGRESS
-         ├── Database integration for settings history
-         ├── Multi-camera site optimization
+PHASE 3: ✓ COMPLETED
+         ✓ Database integration for settings history
+         ✓ ONVIF camera discovery (WS-Discovery)
+         ✓ Automated settings application via ONVIF
+         ✓ WebRTC low-latency streaming
+
+PHASE 4: IN PROGRESS
+         ├── Additional VMS integrations (Genetec, Milestone, ACC)
          ├── Storage capacity calculator
-         └── VMS-specific export formats
-
-PHASE 4: PLANNED
-         ├── Direct VMS API integration (Genetec, Milestone, ACC)
-         ├── Camera discovery via ONVIF
-         ├── Automated settings application
+         ├── Multi-camera batch optimization
          └── Performance monitoring & feedback loop
 ```
 

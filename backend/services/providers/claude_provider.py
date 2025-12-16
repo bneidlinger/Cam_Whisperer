@@ -132,7 +132,7 @@ class ClaudeOptimizationProvider(OptimizationProvider):
             }
 
             # Call Claude API with datasheet specs if available
-            recommended_dict, confidence, explanation = (
+            recommended_dict, confidence, explanation, ai_warnings = (
                 self.client.optimize_camera_settings(
                     camera_context=camera_dict,
                     current_settings=current_dict,
@@ -146,8 +146,9 @@ class ClaudeOptimizationProvider(OptimizationProvider):
             # Parse response into typed settings
             recommended = self._parse_recommended_settings(recommended_dict)
 
-            # Generate warnings
-            warnings = self._generate_warnings(recommended, capabilities, context)
+            # Combine AI warnings with constraint validation warnings
+            validation_warnings = self._generate_warnings(recommended, capabilities, context)
+            warnings = ai_warnings + validation_warnings
 
             processing_time = (datetime.utcnow() - start_time).total_seconds()
 
@@ -174,7 +175,7 @@ class ClaudeOptimizationProvider(OptimizationProvider):
             elif "auth" in error_msg.lower() or "401" in error_msg:
                 raise ProviderAuthError(provider="claude")
             elif "invalid" in error_msg.lower() or "parse" in error_msg.lower():
-                raise InvalidResponseError(message=error_msg)
+                raise InvalidResponseError(message=error_msg, provider="claude")
             else:
                 raise ProviderError(
                     provider="claude",
@@ -203,6 +204,7 @@ class ClaudeOptimizationProvider(OptimizationProvider):
             exposure = ExposureSettings(
                 mode=e.get("mode", "Auto"),
                 shutter=e.get("shutter"),
+                iris=e.get("iris"),
                 gain_limit=e.get("gainLimit"),
                 wdr=e.get("wdr", "Off"),
                 blc=e.get("blc", "Off"),

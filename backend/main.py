@@ -612,6 +612,109 @@ async def get_camera_snapshot_onvif(
         return None
 
 
+# ---- Security Endpoints (Phase 5) ----
+
+class DiscoveryModeRequest(BaseModel):
+    """Request to change camera discovery mode"""
+    ip: str
+    port: int = 80
+    username: str
+    password: str
+    discoverable: bool
+
+
+@app.get("/api/camera/{camera_ip}/discovery-mode")
+async def get_camera_discovery_mode(
+    camera_ip: str,
+    port: int = 80,
+    username: str = "",
+    password: str = ""
+):
+    """
+    Get current WS-Discovery mode from camera (Phase 5 Security)
+
+    Returns whether the camera responds to network discovery probes.
+    """
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+
+    from integrations.onvif_client import ONVIFClient
+
+    try:
+        client = ONVIFClient()
+        camera = await client.connect_camera(
+            ip=camera_ip,
+            port=port,
+            username=username,
+            password=password
+        )
+        result = await client.get_discovery_mode(camera)
+        return {
+            "ip": camera_ip,
+            "port": port,
+            **result
+        }
+    except Exception as e:
+        logger.error(f"Failed to get discovery mode: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/camera/discovery-mode")
+async def set_camera_discovery_mode(req: DiscoveryModeRequest):
+    """
+    Set WS-Discovery mode on camera (Phase 5 Security)
+
+    Security best practice: Disable discovery after initial provisioning
+    to prevent unauthorized network enumeration.
+
+    Set discoverable=false to disable, discoverable=true to enable.
+    """
+    from integrations.onvif_client import ONVIFClient
+
+    try:
+        client = ONVIFClient()
+        camera = await client.connect_camera(
+            ip=req.ip,
+            port=req.port,
+            username=req.username,
+            password=req.password
+        )
+        result = await client.set_discovery_mode(camera, req.discoverable)
+        return {
+            "ip": req.ip,
+            "port": req.port,
+            **result
+        }
+    except Exception as e:
+        logger.error(f"Failed to set discovery mode: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/camera/{camera_ip}/tls-certificate")
+async def validate_camera_tls_certificate(
+    camera_ip: str,
+    port: int = 443
+):
+    """
+    Validate camera's TLS certificate (Phase 5 Security)
+
+    Returns certificate details including:
+    - Whether the certificate is valid
+    - Whether it's self-signed
+    - Expiration date
+    - Issuer information
+    """
+    from integrations.onvif_client import ONVIFClient
+
+    try:
+        client = ONVIFClient()
+        result = await client.validate_camera_tls(camera_ip, port)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to validate TLS certificate: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/camera/{camera_ip}/snapshot")
 async def get_snapshot(
     camera_ip: str,
@@ -1818,3 +1921,269 @@ async def webrtc_stream_endpoint(
         except Exception:
             pass
         await websocket.close()
+
+
+# ---- MQTT Events Endpoints (Phase 4 - Profile M) ----
+
+# Pydantic models for MQTT API
+class MQTTBrokerConfigRequest(BaseModel):
+    """MQTT broker configuration"""
+    host: str = "localhost"
+    port: int = 1883
+    username: Optional[str] = None
+    password: Optional[str] = None
+    use_tls: bool = False
+
+
+class CameraMQTTConfigRequest(BaseModel):
+    """Request to configure camera MQTT publishing"""
+    camera_ip: str
+    camera_port: int = 80
+    username: str
+    password: str
+    topic_prefix: Optional[str] = None
+
+
+@app.get("/api/mqtt/status")
+async def get_mqtt_status():
+    """
+    Get MQTT event bridge status (Phase 4 - Profile M)
+
+    Returns:
+        MQTT bridge status including connection state and statistics
+    """
+    try:
+        from integrations.mqtt_events import get_event_bridge, MQTT_AVAILABLE
+
+        if not MQTT_AVAILABLE:
+            return {
+                "available": False,
+                "error": "paho-mqtt not installed. Install with: pip install paho-mqtt>=2.0.0",
+            }
+
+        bridge = get_event_bridge()
+        if bridge is None:
+            return {
+                "available": True,
+                "enabled": settings.mqtt_enabled,
+                "connected": False,
+                "status": "not_initialized",
+            }
+
+        status = bridge.get_status()
+        status["available"] = True
+        status["enabled"] = settings.mqtt_enabled
+        return status
+
+    except Exception as e:
+        logger.error(f"Failed to get MQTT status: {e}")
+        return {
+            "available": False,
+            "error": str(e),
+        }
+
+
+@app.post("/api/mqtt/connect")
+async def connect_mqtt_broker(config: Optional[MQTTBrokerConfigRequest] = None):
+    """
+    Connect to MQTT broker (Phase 4 - Profile M)
+
+    If no config provided, uses settings from .env file.
+
+    Args:
+        config: Optional broker configuration override
+
+    Returns:
+        Connection status
+    """
+    try:
+        from integrations.mqtt_events import (
+            init_event_bridge,
+            MQTTBrokerConfig,
+            MQTT_AVAILABLE,
+        )
+
+        if not MQTT_AVAILABLE:
+            raise HTTPException(
+                status_code=501,
+                detail="paho-mqtt not installed. Install with: pip install paho-mqtt>=2.0.0"
+            )
+
+        # Use provided config or settings
+        if config:
+            broker_config = MQTTBrokerConfig(
+                host=config.host,
+                port=config.port,
+                username=config.username,
+                password=config.password,
+                use_tls=config.use_tls,
+            )
+        else:
+            broker_config = MQTTBrokerConfig(
+                host=settings.mqtt_broker_host,
+                port=settings.mqtt_broker_port,
+                username=settings.mqtt_username or None,
+                password=settings.mqtt_password or None,
+                use_tls=settings.mqtt_use_tls,
+                ca_cert_path=settings.mqtt_ca_cert_path or None,
+                client_id=settings.mqtt_client_id or None,
+            )
+
+        bridge = await init_event_bridge(broker_config)
+
+        return {
+            "success": bridge.connected,
+            "broker": broker_config.to_dict(),
+            "status": "connected" if bridge.connected else "connection_failed",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to connect MQTT broker: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/mqtt/disconnect")
+async def disconnect_mqtt_broker():
+    """
+    Disconnect from MQTT broker (Phase 4 - Profile M)
+
+    Returns:
+        Disconnection status
+    """
+    try:
+        from integrations.mqtt_events import shutdown_event_bridge
+
+        shutdown_event_bridge()
+
+        return {
+            "success": True,
+            "status": "disconnected",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to disconnect MQTT: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/mqtt/camera/configure")
+async def configure_camera_mqtt(req: CameraMQTTConfigRequest):
+    """
+    Configure camera to publish events to MQTT broker (Phase 4 - Profile M)
+
+    Requires Profile M support on the camera.
+
+    Args:
+        req: Camera connection details and MQTT topic prefix
+
+    Returns:
+        Configuration result
+    """
+    try:
+        from integrations.mqtt_events import get_event_bridge
+
+        bridge = get_event_bridge()
+        if bridge is None or not bridge.connected:
+            raise HTTPException(
+                status_code=400,
+                detail="MQTT bridge not connected. Call /api/mqtt/connect first."
+            )
+
+        result = await bridge.configure_camera_mqtt(
+            camera_ip=req.camera_ip,
+            camera_port=req.camera_port,
+            username=req.username,
+            password=req.password,
+            topic_prefix=req.topic_prefix,
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to configure camera MQTT: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/mqtt/camera/{camera_ip}")
+async def remove_camera_mqtt(
+    camera_ip: str,
+    port: int = 80,
+    username: str = "",
+    password: str = ""
+):
+    """
+    Remove MQTT configuration from camera (Phase 4 - Profile M)
+
+    Args:
+        camera_ip: Camera IP address
+        port: Camera ONVIF port
+        username: Camera username
+        password: Camera password
+
+    Returns:
+        Removal result
+    """
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+
+    try:
+        from integrations.mqtt_events import get_event_bridge
+
+        bridge = get_event_bridge()
+        if bridge is None:
+            raise HTTPException(
+                status_code=400,
+                detail="MQTT bridge not initialized"
+            )
+
+        result = await bridge.remove_camera_mqtt(
+            camera_ip=camera_ip,
+            camera_port=port,
+            username=username,
+            password=password,
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to remove camera MQTT config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/mqtt/subscribe")
+async def subscribe_mqtt_topic(topic: str):
+    """
+    Subscribe to an MQTT topic (Phase 4 - Profile M)
+
+    Args:
+        topic: MQTT topic pattern (supports wildcards: +, #)
+
+    Returns:
+        Subscription status
+    """
+    try:
+        from integrations.mqtt_events import get_event_bridge
+
+        bridge = get_event_bridge()
+        if bridge is None or not bridge.connected:
+            raise HTTPException(
+                status_code=400,
+                detail="MQTT bridge not connected"
+            )
+
+        success = bridge.subscribe(topic)
+
+        return {
+            "success": success,
+            "topic": topic,
+            "subscriptions": list(bridge.subscribed_topics),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to subscribe to topic: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

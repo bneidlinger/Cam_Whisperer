@@ -34,7 +34,7 @@ class ClaudeVisionClient:
         constraints: Dict[str, Any],
         sample_frame: Optional[str] = None,
         datasheet_specs: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[Dict[str, Any], float, str]:
+    ) -> Tuple[Dict[str, Any], float, str, list]:
         """
         Generate optimal camera settings using Claude Vision
 
@@ -47,7 +47,7 @@ class ClaudeVisionClient:
             datasheet_specs: Camera datasheet specifications (optional)
 
         Returns:
-            Tuple of (recommended_settings, confidence, explanation)
+            Tuple of (recommended_settings, confidence, explanation, warnings)
         """
         try:
             # Build the prompt
@@ -60,14 +60,15 @@ class ClaudeVisionClient:
 
             # Add image if provided
             if sample_frame:
-                image_data = self._extract_base64_image(sample_frame)
+                image_data, media_type = self._extract_base64_image(sample_frame)
                 if image_data:
+                    logger.debug(f"Adding image with media type: {media_type}")
                     message_content.append(
                         {
                             "type": "image",
                             "source": {
                                 "type": "base64",
-                                "media_type": "image/jpeg",
+                                "media_type": media_type,
                                 "data": image_data,
                             },
                         }
@@ -112,16 +113,27 @@ class ClaudeVisionClient:
                 "explanation", "AI-generated optimization settings."
             )
 
+            # Extract warnings from Claude's response
+            ai_warnings = settings_data.get("warnings", [])
+            if isinstance(ai_warnings, list):
+                # Filter out placeholder text
+                ai_warnings = [
+                    w for w in ai_warnings
+                    if w and "List any" not in w and len(w) > 5
+                ]
+            else:
+                ai_warnings = []
+
             # Calculate confidence based on completeness and constraints
             confidence = self._calculate_confidence(
                 settings_data, constraints, capabilities
             )
 
             logger.info(
-                f"Claude optimization complete. Confidence: {confidence:.2f}"
+                f"Claude optimization complete. Confidence: {confidence:.2f}, Warnings: {len(ai_warnings)}"
             )
 
-            return recommended_settings, confidence, explanation
+            return recommended_settings, confidence, explanation, ai_warnings
 
         except Exception as e:
             logger.error(f"Claude Vision API error: {str(e)}", exc_info=True)
@@ -203,31 +215,39 @@ Return your recommendations in this EXACT JSON structure (no additional text):
     "codec": "H.265",
     "fps": 20,
     "bitrateMbps": 3.5,
-    "keyframeInterval": 40,
-    "cbr": true
+    "bitrateMode": "VBR",
+    "gopSize": 40,
+    "profile": "Main"
   }},
   "exposure": {{
+    "mode": "Auto",
     "shutter": "1/250",
     "iris": "Auto",
-    "gainLimit": "36dB",
+    "gainLimit": 36,
     "wdr": "High",
-    "backlightComp": "Off"
+    "blc": "Off",
+    "hlc": "Off"
   }},
   "lowLight": {{
     "irMode": "Auto",
-    "irIntensity": "Medium",
-    "noiseReduction": "Low",
-    "slowShutter": "Off"
+    "irIntensity": 50,
+    "dayNightMode": "Auto",
+    "dnr": "Medium",
+    "slowShutter": "Off",
+    "sensitivity": "Medium"
   }},
   "image": {{
-    "sharpening": "High",
-    "contrast": "55",
-    "saturation": "50"
+    "brightness": 50,
+    "contrast": 55,
+    "saturation": 50,
+    "sharpness": 60,
+    "whiteBalance": "Auto",
+    "defog": "Off"
   }},
   "warnings": [
-    "List any constraint violations or concerns here"
+    "List any constraint violations, capability limitations, or concerns here"
   ],
-  "explanation": "Provide a detailed 2-3 paragraph technical explanation of your key recommendations and the trade-offs made. Explain WHY you chose these settings, not just WHAT they are. Reference the scene analysis if an image was provided."
+  "explanation": "2-3 sentence technical explanation of key recommendations and trade-offs. Reference scene analysis if image provided."
 }}
 
 CRITICAL: Return ONLY valid JSON. No markdown code blocks, no extra text, just the JSON object.
@@ -235,15 +255,48 @@ CRITICAL: Return ONLY valid JSON. No markdown code blocks, no extra text, just t
 
         return prompt
 
-    def _extract_base64_image(self, data_url: str) -> Optional[str]:
-        """Extract base64 image data from data URL"""
+    def _extract_base64_image(self, data_url: str) -> tuple:
+        """
+        Extract base64 image data and media type from data URL.
+
+        Args:
+            data_url: Data URL like "data:image/png;base64,iVBORw0..."
+
+        Returns:
+            Tuple of (base64_data, media_type) or (None, None) if invalid
+        """
         try:
             if "base64," in data_url:
-                return data_url.split("base64,")[1]
-            return data_url
+                # Parse data URL format: data:image/jpeg;base64,<data>
+                parts = data_url.split("base64,")
+                base64_data = parts[1]
+
+                # Extract media type from the prefix
+                prefix = parts[0]  # "data:image/jpeg;"
+                media_type = "image/jpeg"  # default
+
+                if prefix.startswith("data:"):
+                    # Extract media type between "data:" and ";"
+                    type_part = prefix[5:]  # Remove "data:"
+                    if ";" in type_part:
+                        media_type = type_part.split(";")[0]
+                    elif type_part:
+                        media_type = type_part
+
+                # Validate media type is an image type Claude supports
+                supported_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+                if media_type not in supported_types:
+                    logger.warning(f"Unsupported media type {media_type}, defaulting to image/jpeg")
+                    media_type = "image/jpeg"
+
+                return base64_data, media_type
+
+            # Raw base64 without data URL prefix - assume JPEG
+            return data_url, "image/jpeg"
+
         except Exception as e:
             logger.warning(f"Failed to extract base64 image: {e}")
-            return None
+            return None, None
 
     def _parse_claude_response(self, response_text: str) -> Dict[str, Any]:
         """Parse Claude's JSON response"""

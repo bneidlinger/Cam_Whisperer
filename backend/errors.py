@@ -213,15 +213,16 @@ class ProviderAuthError(ProviderError):
         self.recovery_hint = "Check API key configuration in .env file"
 
 
-class InvalidResponseError(OptimizationError):
+class InvalidResponseError(ProviderError):
     """AI provider returned invalid response"""
 
-    def __init__(self, message: str = "Invalid response from AI provider", raw_response: Optional[str] = None):
+    def __init__(self, message: str = "Invalid response from AI provider", raw_response: Optional[str] = None, provider: str = "unknown"):
         super().__init__(
+            provider=provider,
             message=message,
             details={"rawResponse": raw_response[:500] if raw_response else None},
-            recovery_hint="AI response could not be parsed; using heuristic fallback"
         )
+        self.recovery_hint = "AI response could not be parsed; using heuristic fallback"
 
 
 class ConstraintViolationError(OptimizationError):

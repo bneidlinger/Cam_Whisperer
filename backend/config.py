@@ -73,6 +73,24 @@ class Settings(BaseSettings):
     # STUN Server (free, for direct P2P when possible)
     stun_server_urls: str = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
 
+    # TLS/SSL Configuration (Phase 5 Security)
+    tls_verify_certificates: bool = False  # Set True for production with proper certs
+    tls_allow_self_signed: bool = True  # Allow self-signed certs (common in cameras)
+    tls_ca_bundle_path: str = ""  # Path to custom CA bundle (optional)
+    tls_client_cert_path: str = ""  # Path to client certificate (optional)
+    tls_client_key_path: str = ""  # Path to client private key (optional)
+
+    # MQTT Configuration (Phase 4 - Profile M Events)
+    mqtt_enabled: bool = False  # Enable MQTT event bridge
+    mqtt_broker_host: str = "localhost"
+    mqtt_broker_port: int = 1883
+    mqtt_username: str = ""
+    mqtt_password: str = ""
+    mqtt_use_tls: bool = False
+    mqtt_ca_cert_path: str = ""
+    mqtt_client_id: str = ""  # Auto-generated if empty
+    mqtt_topic_prefix: str = "platonicam"
+
     class Config:
         env_file = ".env"
         case_sensitive = False

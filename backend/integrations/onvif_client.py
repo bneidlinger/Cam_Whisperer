@@ -31,6 +31,7 @@ warnings.filterwarnings("ignore", category=ResourceWarning, module="wsdiscovery"
 
 import logging
 import os
+import ssl
 from typing import List, Dict, Optional, Tuple, Any
 from datetime import datetime
 import asyncio
@@ -38,6 +39,16 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# TLS helper import (Phase 5 Security)
+try:
+    from utils.tls_helper import get_default_ssl_context, validate_camera_certificate
+    TLS_AVAILABLE = True
+except ImportError:
+    logger.warning("TLS helper not available - using default SSL settings")
+    TLS_AVAILABLE = False
+    get_default_ssl_context = None
+    validate_camera_certificate = None
 
 # Third-party imports
 from onvif import ONVIFCamera
@@ -88,21 +99,30 @@ class ONVIFClient:
     # Connection pool: {(ip, port): ONVIFCamera}
     _connection_pool: Dict[Tuple[str, int], ONVIFCamera] = {}
 
-    def __init__(self, timeout: int = 10, use_cache: bool = True):
+    # SSL context for TLS connections (Phase 5 Security)
+    _ssl_context: Optional[ssl.SSLContext] = None
+
+    def __init__(self, timeout: int = 10, use_cache: bool = True, use_tls: bool = True):
         """
         Initialize ONVIF client
 
         Args:
             timeout: Connection timeout in seconds (default: 10)
             use_cache: Whether to use WSDL caching (default: True)
+            use_tls: Whether to use TLS for HTTPS connections (default: True)
         """
         self.timeout = timeout
         self.use_cache = use_cache
+        self.use_tls = use_tls
         self.executor = ThreadPoolExecutor(max_workers=10)
 
         # Initialize WSDL cache if enabled
         if use_cache and ONVIFClient._wsdl_cache is None:
             self._init_wsdl_cache()
+
+        # Initialize TLS context (Phase 5 Security)
+        if use_tls and TLS_AVAILABLE and ONVIFClient._ssl_context is None:
+            self._init_ssl_context()
 
     @classmethod
     def _init_wsdl_cache(cls):
@@ -125,6 +145,58 @@ class ONVIFClient:
                 logger.info("WSDL cache cleared")
         except Exception as e:
             logger.error(f"Failed to clear cache: {e}")
+
+    @classmethod
+    def _init_ssl_context(cls):
+        """Initialize the shared SSL context (Phase 5 Security)"""
+        try:
+            if TLS_AVAILABLE and get_default_ssl_context:
+                cls._ssl_context = get_default_ssl_context()
+                logger.info("SSL context initialized for secure camera connections")
+            else:
+                # Fallback: create basic context allowing self-signed certs
+                cls._ssl_context = ssl.create_default_context()
+                cls._ssl_context.check_hostname = False
+                cls._ssl_context.verify_mode = ssl.CERT_NONE
+                logger.warning("Using fallback SSL context (no verification)")
+        except Exception as e:
+            logger.warning(f"Failed to initialize SSL context: {e}")
+            cls._ssl_context = None
+
+    @classmethod
+    def get_ssl_context(cls) -> Optional[ssl.SSLContext]:
+        """Get the shared SSL context"""
+        if cls._ssl_context is None:
+            cls._init_ssl_context()
+        return cls._ssl_context
+
+    async def validate_camera_tls(self, ip: str, port: int = 443) -> Dict:
+        """
+        Validate a camera's TLS certificate (Phase 5 Security)
+
+        Args:
+            ip: Camera IP address
+            port: HTTPS port (default: 443)
+
+        Returns:
+            Dictionary with certificate validation results
+        """
+        if not TLS_AVAILABLE or not validate_camera_certificate:
+            return {
+                "host": ip,
+                "port": port,
+                "valid": False,
+                "error": "TLS validation not available"
+            }
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            validate_camera_certificate,
+            ip,
+            port,
+            self.timeout
+        )
 
     @classmethod
     def get_cached_connection(cls, ip: str, port: int) -> Optional[ONVIFCamera]:
@@ -472,6 +544,166 @@ class ONVIFClient:
             logger.error(f"Direct connect failed for {ip}:{port}: {e}")
             result["error"] = str(e)
             return result
+
+    # =========================================================================
+    # DISCOVERY MODE CONTROL (Phase 5 Security)
+    # =========================================================================
+
+    async def get_discovery_mode(self, camera: ONVIFCamera) -> Dict:
+        """
+        Get current WS-Discovery mode from camera (Phase 5 Security)
+
+        Args:
+            camera: ONVIFCamera instance
+
+        Returns:
+            Dictionary with discovery mode info:
+            {
+                "mode": "Discoverable" or "NonDiscoverable",
+                "discoverable": True/False,
+                "can_modify": True/False
+            }
+        """
+        logger.info("Querying camera discovery mode...")
+
+        try:
+            device_mgmt = camera.create_devicemgmt_service()
+            loop = asyncio.get_event_loop()
+
+            mode = await loop.run_in_executor(
+                self.executor,
+                device_mgmt.GetDiscoveryMode
+            )
+
+            # mode is typically a string like "Discoverable" or "NonDiscoverable"
+            mode_str = str(mode) if mode else "Unknown"
+            is_discoverable = mode_str.lower() == "discoverable"
+
+            logger.info(f"Camera discovery mode: {mode_str}")
+
+            return {
+                "mode": mode_str,
+                "discoverable": is_discoverable,
+                "can_modify": True  # We'll update this if SetDiscoveryMode fails
+            }
+
+        except Exception as e:
+            logger.warning(f"Failed to get discovery mode: {e}")
+            return {
+                "mode": "Unknown",
+                "discoverable": True,  # Assume discoverable if can't query
+                "can_modify": False,
+                "error": str(e)
+            }
+
+    async def set_discovery_mode(
+        self,
+        camera: ONVIFCamera,
+        discoverable: bool
+    ) -> Dict:
+        """
+        Set WS-Discovery mode on camera (Phase 5 Security)
+
+        After initial provisioning, it's a security best practice to disable
+        WS-Discovery to prevent unauthorized network enumeration.
+
+        Args:
+            camera: ONVIFCamera instance
+            discoverable: True to enable discovery, False to disable
+
+        Returns:
+            Dictionary with result:
+            {
+                "success": True/False,
+                "mode": "Discoverable" or "NonDiscoverable",
+                "previous_mode": "...",
+                "error": "..." (if any)
+            }
+        """
+        mode_str = "Discoverable" if discoverable else "NonDiscoverable"
+        logger.info(f"Setting camera discovery mode to: {mode_str}")
+
+        result = {
+            "success": False,
+            "mode": mode_str,
+            "previous_mode": None,
+            "error": None
+        }
+
+        try:
+            device_mgmt = camera.create_devicemgmt_service()
+            loop = asyncio.get_event_loop()
+
+            # Get current mode first
+            try:
+                current_mode = await loop.run_in_executor(
+                    self.executor,
+                    device_mgmt.GetDiscoveryMode
+                )
+                result["previous_mode"] = str(current_mode) if current_mode else "Unknown"
+            except Exception:
+                result["previous_mode"] = "Unknown"
+
+            # Set new mode
+            await loop.run_in_executor(
+                self.executor,
+                device_mgmt.SetDiscoveryMode,
+                {"DiscoveryMode": mode_str}
+            )
+
+            result["success"] = True
+            logger.info(f"Successfully set discovery mode to {mode_str}")
+
+            if not discoverable:
+                logger.info(
+                    "WS-Discovery disabled. Camera will no longer respond to "
+                    "network discovery probes. Use direct connection instead."
+                )
+
+            return result
+
+        except ZeepFault as e:
+            error_msg = str(e)
+            if "not implemented" in error_msg.lower() or "not supported" in error_msg.lower():
+                result["error"] = "Camera does not support changing discovery mode"
+            elif "not authorized" in error_msg.lower():
+                result["error"] = "Not authorized to change discovery mode"
+            else:
+                result["error"] = f"SOAP fault: {error_msg}"
+            logger.warning(f"Failed to set discovery mode: {result['error']}")
+            return result
+
+        except Exception as e:
+            result["error"] = str(e)
+            logger.error(f"Failed to set discovery mode: {e}")
+            return result
+
+    async def disable_discovery(self, camera: ONVIFCamera) -> Dict:
+        """
+        Disable WS-Discovery on camera (convenience method)
+
+        Security best practice: Call this after initial camera provisioning
+        to prevent unauthorized network enumeration.
+
+        Args:
+            camera: ONVIFCamera instance
+
+        Returns:
+            Result dictionary from set_discovery_mode()
+        """
+        return await self.set_discovery_mode(camera, discoverable=False)
+
+    async def enable_discovery(self, camera: ONVIFCamera) -> Dict:
+        """
+        Enable WS-Discovery on camera (convenience method)
+
+        Args:
+            camera: ONVIFCamera instance
+
+        Returns:
+            Result dictionary from set_discovery_mode()
+        """
+        return await self.set_discovery_mode(camera, discoverable=True)
 
     # =========================================================================
     # CAPABILITY & INFO METHODS
