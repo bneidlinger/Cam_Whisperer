@@ -176,6 +176,28 @@ CAMERA CONTEXT:
 - Primary Purpose: {purpose}
 - Camera Model: {camera_context.get('model', 'unknown')}
 - Manufacturer: {camera_context.get('manufacturer', 'unknown')}
+
+SENSOR TECHNOLOGY DETECTION:
+Identify the sensor technology from the model name or datasheet specs and apply appropriate strategy:
+
+- **ColorVu/Full-Color** (keywords: ColorVu, full color, 24/7 color):
+  Optimized for preserving color in low light. Strategy: Manage exposure triangle to keep
+  camera in color mode as long as possible. Avoid switching to IR/B&W. Use lower DNR to
+  preserve color fidelity. These cameras have large aperture lenses and high-sensitivity sensors.
+
+- **Starlight/Darkfighter/LightHunter** (keywords: Starlight, Darkfighter, LightHunter, ultra low-light):
+  Maximum low-light sensitivity for B&W clarity. Strategy: Prioritize sensitivity, use higher
+  DNR levels to manage noise. Accept B&W mode for best low-light performance. These cameras
+  excel at long-range detection in near-darkness.
+
+- **Standard IR cameras**:
+  Traditional day/night cameras with IR illumination. Strategy: Balance IR intensity with
+  scene requirements. Use moderate DNR. IR mode Auto is typically best.
+
+- **WDR Type** (if identifiable):
+  True WDR (hardware) vs Digital WDR (D-WDR/software). True WDR handles high-contrast scenes
+  better with less processing overhead. D-WDR consumes CPU resources that may impact
+  concurrent analytics performance.
 {datasheet_section}
 CURRENT SETTINGS:
 {json.dumps(current_settings, indent=2)}
@@ -187,12 +209,34 @@ CONSTRAINTS:
 - Bandwidth Limit: {bandwidth_limit} Mbps
 - Retention Target: {retention_days} days
 
+CODEC SELECTION STRATEGY:
+When recommending video codec, consider computational load vs compression efficiency:
+
+- **H.265 (HEVC)**: RECOMMENDED DEFAULT for real-time edge streaming.
+  ~50% better compression than H.264 with manageable encoding load.
+  Integrated in ONVIF Profile T, broad compatibility.
+
+- **H.264 (AVC)**: Use when camera has limited processing power, runs
+  concurrent edge analytics, or for maximum compatibility with older VMS.
+  Lower compression but minimal CPU impact.
+
+- **H.266 (VVC)**: AVOID for real-time streaming. Encoding is 27-174x slower
+  than AV1. Only suitable for archival streams or static scenes where
+  latency is irrelevant. Check if camera actually supports this.
+
+- **AV1**: Good compression but CPU-intensive encoding. Better suited for
+  server-side transcoding than edge encoding. Rare in surveillance cameras.
+
+Rule: If camera runs edge analytics (AI detection), prefer H.264 or H.265
+to leave CPU headroom. Never recommend VVC for real-time monitoring.
+
 TASK:
 Analyze the camera context and generate optimal settings that:
 1. Maximize evidence quality for the stated purpose ({purpose})
 2. Stay within bandwidth and storage constraints
 3. Handle the scene type appropriately ({scene_type})
 4. Prevent common deployment mistakes (motion blur, excessive noise, poor WDR config)
+5. Consider codec computational load vs edge analytics requirements
 
 SCENE TYPE GUIDELINES:
 - "entrance": Enable WDR for glass/bright backgrounds, faster shutter for faces
@@ -201,11 +245,24 @@ SCENE TYPE GUIDELINES:
 - "perimeter": Prioritize detection over identification, wider FOV
 - "cashwrap": High detail for transactions, good color reproduction
 
-PURPOSE GUIDELINES:
-- "facial": Shutter 1/250 minimum, 20+ FPS, optimize for skin tones
-- "plates": Shutter 1/500+ minimum, H.265 for bandwidth, high contrast
-- "overview": Broader coverage, lower FPS acceptable (10-15)
-- "evidence": Prioritize quality over bandwidth, high bitrate
+PURPOSE GUIDELINES (with constraint hierarchy):
+- "facial": Shutter 1/250 minimum (NON-NEGOTIABLE), 20+ FPS, optimize for skin tones.
+  Use Shutter Priority mode. Moderate gain limit. Light DNR to preserve facial detail.
+
+- "plates" (LPR/ANPR): This is the most constrained purpose:
+  * Shutter 1/500+ (NON-NEGOTIABLE) - motion freeze is absolute priority
+  * WDR OFF (prevents ghosting artifacts on moving plates - critical for OCR)
+  * HLC ON (masks headlight glare)
+  * Use Shutter Priority mode - let camera auto-adjust gain/iris
+  * Accept higher gain/noise - noise is preferable to motion blur for OCR accuracy
+  * H.265 for bandwidth efficiency
+  * Note: Physical installation constraints (angle ±5°, offset <15°) are critical
+
+- "overview": Broader coverage, lower FPS acceptable (10-15), can use slower shutter
+
+- "evidence": Prioritize quality over bandwidth, high bitrate, CBR mode for consistent quality
+
+- "intrusion": Prioritize detection over identification, higher FPS for motion capture
 
 Return your recommendations in this EXACT JSON structure (no additional text):
 

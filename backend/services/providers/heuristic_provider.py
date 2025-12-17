@@ -34,17 +34,26 @@ logger = logging.getLogger(__name__)
 PURPOSE_RULES: Dict[CameraPurpose, Dict[str, Any]] = {
     CameraPurpose.PLATES: {
         "min_fps": 25,
-        "shutter": "1/500",
+        "exposure_mode": "Shutter Priority",  # Lock shutter, let camera adjust gain/iris
+        "shutter": "1/500",  # Non-negotiable: >=1/200s required, 1/500 preferred
         "slow_shutter": "Off",
         "wdr": "Off",  # WDR causes ghosting on fast-moving plates
-        "hlc": "On",  # Mask headlight glare
-        "gain_limit": 24,  # Limit noise, prioritize fast shutter
-        "explanation": "License plate recognition requires fast shutter (1/500+) to freeze motion. HLC masks headlight glare. WDR disabled to prevent ghosting artifacts on moving vehicles.",
+        "hlc": "On",  # Critical: Mask headlight glare
+        "gain_limit": 36,  # Higher gain tolerance - accept noise to ensure zero motion blur
+        "dnr": "Medium",  # Moderate noise reduction to compensate for high gain
+        "explanation": "LPR requires fixed fast shutter (1/500s) to freeze license plates - this is non-negotiable. Exposure mode set to Shutter Priority so camera auto-adjusts gain/iris to compensate for reduced light intake. HLC masks headlight glare. WDR disabled to prevent ghosting artifacts. Higher gain limit accepted (noise is preferable to motion blur for OCR accuracy).",
+        "warnings": [
+            "LPR accuracy depends on physical installation: plate tilt within ±5°, vertical/horizontal angle <30°, offset <15°",
+            "Maximum effective vehicle speed for reliable capture depends on distance - verify during commissioning",
+        ],
     },
     CameraPurpose.FACIAL: {
         "min_fps": 20,
-        "shutter": "1/250",
-        "explanation": "Facial recognition needs fast shutter and good detail",
+        "exposure_mode": "Shutter Priority",  # Lock shutter for motion freeze
+        "shutter": "1/250",  # Minimum for facial capture
+        "gain_limit": 30,  # Moderate gain - balance noise vs. exposure
+        "dnr": "Low",  # Light noise reduction to preserve facial detail
+        "explanation": "Facial recognition requires fast shutter (1/250s min) to freeze faces and prevent motion blur. Moderate gain limit balances low-light capability with noise. Light DNR preserves facial detail for recognition algorithms.",
     },
     CameraPurpose.OVERVIEW: {
         "min_fps": 10,
@@ -184,19 +193,7 @@ class HeuristicOptimizationProvider(OptimizationProvider):
 
         explanations = []
 
-        # Apply purpose rules
-        if camera.purpose:
-            purpose_rule = PURPOSE_RULES.get(camera.purpose)
-            if purpose_rule:
-                self._apply_purpose_rule(
-                    purpose_rule,
-                    stream_settings,
-                    exposure_settings,
-                    low_light_settings,
-                )
-                explanations.append(purpose_rule.get("explanation", ""))
-
-        # Apply scene type rules
+        # Apply scene type rules FIRST (general environmental adjustments)
         if camera.scene_type:
             scene_rule = SCENE_RULES.get(camera.scene_type)
             if scene_rule:
@@ -208,6 +205,23 @@ class HeuristicOptimizationProvider(OptimizationProvider):
                     stream_settings,
                 )
                 explanations.append(scene_rule.get("explanation", ""))
+
+        # Apply purpose rules SECOND (specific mission requirements override scene defaults)
+        # This ensures mission-critical settings (e.g., LPR shutter speed, WDR=Off)
+        # take precedence over general scene recommendations
+        purpose_warnings = []
+        if camera.purpose:
+            purpose_rule = PURPOSE_RULES.get(camera.purpose)
+            if purpose_rule:
+                self._apply_purpose_rule(
+                    purpose_rule,
+                    stream_settings,
+                    exposure_settings,
+                    low_light_settings,
+                )
+                explanations.append(purpose_rule.get("explanation", ""))
+                # Collect purpose-specific warnings (e.g., LPR installation constraints)
+                purpose_warnings = purpose_rule.get("warnings", [])
 
         # Apply bandwidth constraints
         if context.bandwidth_limit_mbps:
@@ -227,8 +241,9 @@ class HeuristicOptimizationProvider(OptimizationProvider):
             image=image_settings,
         )
 
-        # Generate warnings
-        warnings = self._generate_warnings(recommended, capabilities, context)
+        # Generate warnings (combine purpose-specific with general validation warnings)
+        validation_warnings = self._generate_warnings(recommended, capabilities, context)
+        warnings = purpose_warnings + validation_warnings
 
         processing_time = (datetime.utcnow() - start_time).total_seconds()
 
@@ -345,6 +360,9 @@ class HeuristicOptimizationProvider(OptimizationProvider):
         if "shutter" in rule:
             exposure.shutter = rule["shutter"]
 
+        if "exposure_mode" in rule:
+            exposure.mode = rule["exposure_mode"]
+
         if "slow_shutter" in rule:
             low_light.slow_shutter = rule["slow_shutter"]
 
@@ -362,6 +380,9 @@ class HeuristicOptimizationProvider(OptimizationProvider):
 
         if "gain_limit" in rule:
             exposure.gain_limit = rule["gain_limit"]
+
+        if "dnr" in rule:
+            low_light.dnr = rule["dnr"]
 
     def _apply_scene_rule(
         self,
@@ -463,7 +484,7 @@ class HeuristicOptimizationProvider(OptimizationProvider):
         capabilities: CameraCapabilities,
         context: OptimizationContext,
     ) -> List[str]:
-        """Generate warnings for constraint violations"""
+        """Generate warnings for constraint violations and recommendations"""
         warnings = []
 
         if not context.sample_frame:
@@ -471,6 +492,28 @@ class HeuristicOptimizationProvider(OptimizationProvider):
                 "No sample frame provided. Using heuristic optimization. "
                 "Upload a sample image for AI-powered scene analysis."
             )
+
+        # Codec computational load warnings
+        if settings.stream and settings.stream.codec:
+            codec = settings.stream.codec.upper()
+            if codec in ("H.266", "VVC", "HEVC2"):
+                warnings.append(
+                    "H.266/VVC codec has very high encoding overhead (27-174x slower than H.265). "
+                    "Only recommended for archival/non-real-time streams. Consider H.265 for live monitoring."
+                )
+            elif codec == "AV1":
+                warnings.append(
+                    "AV1 codec is CPU-intensive for encoding. May impact edge analytics performance. "
+                    "Consider H.265 for cameras running concurrent AI detection."
+                )
+
+        # H.265 recommendation for bandwidth-constrained scenarios
+        if settings.stream and context.bandwidth_limit_mbps:
+            if settings.stream.codec == "H.264" and context.bandwidth_limit_mbps < 4.0:
+                warnings.append(
+                    "Consider H.265 codec for ~50% better compression efficiency "
+                    "given the bandwidth constraint."
+                )
 
         return warnings
 

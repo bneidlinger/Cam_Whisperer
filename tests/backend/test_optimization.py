@@ -1,152 +1,345 @@
 """
-Tests for the optimization service.
+Tests for the optimization service and heuristic provider.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from datetime import datetime
 
 
-class TestOptimizationService:
-    """Tests for OptimizationService class."""
+class TestHeuristicProvider:
+    """Tests for HeuristicOptimizationProvider class."""
 
-    def test_heuristic_fallback_plates(self, sample_camera, sample_capabilities, sample_context):
-        """Test heuristic optimization for license plate recognition."""
-        from services.optimization import OptimizationService
+    @pytest.fixture
+    def provider(self):
+        """Create heuristic provider instance."""
+        from services.providers.heuristic_provider import HeuristicOptimizationProvider
+        return HeuristicOptimizationProvider()
 
-        service = OptimizationService()
-        sample_camera["purpose"] = "plates"
-
-        result = service._optimize_with_heuristic(
-            sample_camera,
-            sample_capabilities,
-            {"stream": {"fps": 15}},
-            sample_context
+    @pytest.fixture
+    def camera_context_plates(self):
+        """Camera context for LPR/plates purpose."""
+        from models.pipeline import CameraContext, SceneType, CameraPurpose
+        return CameraContext(
+            id="CAM-001",
+            ip="192.168.1.100",
+            location="Parking Entrance",
+            scene_type=SceneType.PARKING,
+            purpose=CameraPurpose.PLATES,
+            vendor="Test",
+            model="TestCam-1000"
         )
 
-        assert result["aiProvider"] == "heuristic"
-        assert result["confidence"] == 0.5
-        assert result["recommendedSettings"]["stream"]["fps"] >= 20
-        assert "shutter" in result["recommendedSettings"]["exposure"]
-
-    def test_heuristic_fallback_facial(self, sample_camera, sample_capabilities, sample_context):
-        """Test heuristic optimization for facial recognition."""
-        from services.optimization import OptimizationService
-
-        service = OptimizationService()
-        sample_camera["purpose"] = "facial"
-
-        result = service._optimize_with_heuristic(
-            sample_camera,
-            sample_capabilities,
-            {"stream": {"fps": 15}},
-            sample_context
+    @pytest.fixture
+    def camera_context_facial(self):
+        """Camera context for facial recognition purpose."""
+        from models.pipeline import CameraContext, SceneType, CameraPurpose
+        return CameraContext(
+            id="CAM-002",
+            ip="192.168.1.101",
+            location="Main Entrance",
+            scene_type=SceneType.ENTRANCE,
+            purpose=CameraPurpose.FACIAL,
+            vendor="Test",
+            model="TestCam-2000"
         )
 
-        assert result["aiProvider"] == "heuristic"
-        assert result["recommendedSettings"]["stream"]["fps"] >= 20
-
-    def test_heuristic_entrance_scene(self, sample_camera, sample_capabilities, sample_context):
-        """Test heuristic optimization for entrance scene type."""
-        from services.optimization import OptimizationService
-
-        service = OptimizationService()
-        sample_camera["sceneType"] = "entrance"
-        sample_camera["purpose"] = "overview"
-
-        result = service._optimize_with_heuristic(
-            sample_camera,
-            sample_capabilities,
-            {},
-            sample_context
+    @pytest.fixture
+    def camera_context_overview(self):
+        """Camera context for overview purpose."""
+        from models.pipeline import CameraContext, SceneType, CameraPurpose
+        return CameraContext(
+            id="CAM-003",
+            ip="192.168.1.102",
+            location="Lobby",
+            scene_type=SceneType.ENTRANCE,
+            purpose=CameraPurpose.OVERVIEW,
+            vendor="Test",
+            model="TestCam-3000"
         )
 
-        assert result["recommendedSettings"]["exposure"]["wdr"] == "High"
+    @pytest.fixture
+    def capabilities(self):
+        """Sample camera capabilities."""
+        from models.pipeline import CameraCapabilities
+        return CameraCapabilities(
+            camera_id="CAM-001",
+            supported_codecs=["H.264", "H.265"],
+            supported_resolutions=["1920x1080", "2560x1440", "3840x2160"],
+            max_fps=30,
+            has_wdr=True,
+            has_ir=True,
+            has_hlc=True,
+        )
 
-    def test_generate_warnings_bandwidth_exceeded(self, sample_capabilities):
-        """Test warning generation when bandwidth is exceeded."""
-        from services.optimization import OptimizationService
+    @pytest.fixture
+    def optimization_context(self):
+        """Sample optimization context."""
+        from models.pipeline import OptimizationContext
+        return OptimizationContext(
+            bandwidth_limit_mbps=8.0,
+            target_retention_days=30,
+            sample_frame=None
+        )
 
-        service = OptimizationService()
+    @pytest.mark.asyncio
+    async def test_heuristic_plates_shutter_speed(self, provider, camera_context_plates, capabilities, optimization_context):
+        """Test that LPR optimization enforces fast shutter speed."""
+        result = await provider.optimize(
+            camera=camera_context_plates,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
 
-        settings = {
-            "stream": {"bitrateMbps": 10}
-        }
-        context = {"bandwidthLimitMbps": 8}
+        assert result.provider == "heuristic"
+        assert result.recommended_settings.exposure.shutter == "1/500"
+        assert result.recommended_settings.exposure.mode == "Shutter Priority"
+        assert result.recommended_settings.stream.fps >= 25
 
-        warnings = service._generate_warnings(settings, sample_capabilities, context)
+    @pytest.mark.asyncio
+    async def test_heuristic_plates_wdr_disabled(self, provider, camera_context_plates, capabilities, optimization_context):
+        """Test that LPR optimization disables WDR to prevent ghosting."""
+        result = await provider.optimize(
+            camera=camera_context_plates,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
 
-        assert len(warnings) > 0
-        assert "bandwidth" in warnings[0].lower() or "bitrate" in warnings[0].lower()
+        # WDR should be Off for LPR (prevents ghosting on moving plates)
+        assert result.recommended_settings.exposure.wdr == "Off"
+        # HLC should be On (masks headlight glare)
+        assert result.recommended_settings.exposure.hlc == "On"
 
-    def test_generate_warnings_fps_exceeded(self, sample_capabilities):
-        """Test warning generation when FPS exceeds camera max."""
-        from services.optimization import OptimizationService
+    @pytest.mark.asyncio
+    async def test_heuristic_plates_purpose_overrides_scene(self, provider, camera_context_plates, capabilities, optimization_context):
+        """Test that purpose rules override scene rules for LPR."""
+        # Camera is in PARKING scene which normally sets WDR="Medium"
+        # But PLATES purpose should override to WDR="Off"
+        result = await provider.optimize(
+            camera=camera_context_plates,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
 
-        service = OptimizationService()
+        # Purpose (PLATES) should take precedence over scene (PARKING)
+        assert result.recommended_settings.exposure.wdr == "Off"
 
-        settings = {
-            "stream": {"fps": 60}  # Exceeds maxFps of 30
-        }
-        context = {}
+    @pytest.mark.asyncio
+    async def test_heuristic_plates_warnings(self, provider, camera_context_plates, capabilities, optimization_context):
+        """Test that LPR optimization includes installation warnings."""
+        result = await provider.optimize(
+            camera=camera_context_plates,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
 
-        warnings = service._generate_warnings(settings, sample_capabilities, context)
+        # Should include LPR-specific warnings about physical installation
+        assert len(result.warnings) > 0
+        warning_text = " ".join(result.warnings).lower()
+        assert "angle" in warning_text or "installation" in warning_text or "tilt" in warning_text
 
-        assert len(warnings) > 0
-        assert "fps" in warnings[0].lower()
+    @pytest.mark.asyncio
+    async def test_heuristic_facial_shutter_priority(self, provider, camera_context_facial, capabilities, optimization_context):
+        """Test that facial recognition uses shutter priority mode."""
+        result = await provider.optimize(
+            camera=camera_context_facial,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
 
-    def test_generate_warnings_unsupported_codec(self):
-        """Test warning generation for unsupported codec."""
-        from services.optimization import OptimizationService
+        assert result.recommended_settings.exposure.mode == "Shutter Priority"
+        assert result.recommended_settings.exposure.shutter == "1/250"
+        assert result.recommended_settings.stream.fps >= 20
 
-        service = OptimizationService()
+    @pytest.mark.asyncio
+    async def test_heuristic_entrance_scene_wdr(self, provider, camera_context_overview, capabilities, optimization_context):
+        """Test that entrance scene type enables high WDR."""
+        result = await provider.optimize(
+            camera=camera_context_overview,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
 
-        settings = {
-            "stream": {"codec": "H.266"}
-        }
-        capabilities = {"supportedCodecs": ["H.264", "H.265"]}
-        context = {}
+        # Entrance scene should have High WDR (overview purpose doesn't override it)
+        assert result.recommended_settings.exposure.wdr == "High"
 
-        warnings = service._generate_warnings(settings, capabilities, context)
+    @pytest.mark.asyncio
+    async def test_heuristic_confidence(self, provider, camera_context_overview, capabilities, optimization_context):
+        """Test that heuristic provider returns moderate confidence."""
+        result = await provider.optimize(
+            camera=camera_context_overview,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
 
-        assert len(warnings) > 0
-        assert "codec" in warnings[0].lower()
+        # Heuristic should have moderate confidence (0.6)
+        assert result.confidence == 0.6
+
+    @pytest.mark.asyncio
+    async def test_heuristic_no_sample_frame_warning(self, provider, camera_context_overview, capabilities, optimization_context):
+        """Test that missing sample frame generates a warning."""
+        result = await provider.optimize(
+            camera=camera_context_overview,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
+
+        warning_text = " ".join(result.warnings).lower()
+        assert "sample" in warning_text or "frame" in warning_text or "heuristic" in warning_text
+
+
+class TestCodecWarnings:
+    """Tests for codec-related warnings."""
+
+    @pytest.fixture
+    def provider(self):
+        """Create heuristic provider instance."""
+        from services.providers.heuristic_provider import HeuristicOptimizationProvider
+        return HeuristicOptimizationProvider()
+
+    @pytest.fixture
+    def camera_context(self):
+        """Camera context for testing."""
+        from models.pipeline import CameraContext, SceneType, CameraPurpose
+        return CameraContext(
+            id="CAM-001",
+            ip="192.168.1.100",
+            location="Test Location",
+            scene_type=SceneType.GENERIC,
+            purpose=CameraPurpose.GENERAL,
+        )
+
+    @pytest.fixture
+    def capabilities_with_h266(self):
+        """Capabilities with H.266 support."""
+        from models.pipeline import CameraCapabilities
+        return CameraCapabilities(
+            camera_id="CAM-001",
+            supported_codecs=["H.264", "H.265", "H.266"],
+            max_fps=30,
+        )
+
+    @pytest.fixture
+    def context_bandwidth_limited(self):
+        """Context with low bandwidth limit."""
+        from models.pipeline import OptimizationContext
+        return OptimizationContext(
+            bandwidth_limit_mbps=2.0,
+        )
+
+    @pytest.mark.asyncio
+    async def test_h264_low_bandwidth_warning(self, provider, camera_context, capabilities_with_h266, context_bandwidth_limited):
+        """Test that H.264 with low bandwidth suggests H.265."""
+        from models.pipeline import CameraCurrentSettings, StreamSettings
+
+        current = CameraCurrentSettings(
+            camera_id="CAM-001",
+            stream=StreamSettings(codec="H.264", fps=15),
+        )
+
+        result = await provider.optimize(
+            camera=camera_context,
+            capabilities=capabilities_with_h266,
+            current_settings=current,
+            context=context_bandwidth_limited,
+        )
+
+        # Should warn about H.265 being more efficient
+        warning_text = " ".join(result.warnings).lower()
+        assert "h.265" in warning_text or "compression" in warning_text
 
 
 class TestOptimizationResponse:
     """Tests for optimization response format."""
 
-    def test_response_has_required_fields(self, sample_camera, sample_capabilities, sample_context):
+    @pytest.fixture
+    def provider(self):
+        """Create heuristic provider instance."""
+        from services.providers.heuristic_provider import HeuristicOptimizationProvider
+        return HeuristicOptimizationProvider()
+
+    @pytest.fixture
+    def camera_context(self):
+        """Camera context for testing."""
+        from models.pipeline import CameraContext, SceneType, CameraPurpose
+        return CameraContext(
+            id="CAM-001",
+            ip="192.168.1.100",
+            location="Test Location",
+            scene_type=SceneType.GENERIC,
+            purpose=CameraPurpose.GENERAL,
+        )
+
+    @pytest.fixture
+    def capabilities(self):
+        """Sample camera capabilities."""
+        from models.pipeline import CameraCapabilities
+        return CameraCapabilities(camera_id="CAM-001")
+
+    @pytest.fixture
+    def optimization_context(self):
+        """Sample optimization context."""
+        from models.pipeline import OptimizationContext
+        return OptimizationContext()
+
+    @pytest.mark.asyncio
+    async def test_response_has_required_fields(self, provider, camera_context, capabilities, optimization_context):
         """Test that optimization response has all required fields."""
-        from services.optimization import OptimizationService
-
-        service = OptimizationService()
-
-        result = service._optimize_with_heuristic(
-            sample_camera,
-            sample_capabilities,
-            {},
-            sample_context
+        result = await provider.optimize(
+            camera=camera_context,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
         )
 
-        assert "recommendedSettings" in result
-        assert "confidence" in result
-        assert "warnings" in result
-        assert "explanation" in result
-        assert "aiProvider" in result
-        assert "processingTime" in result
-        assert "generatedAt" in result
+        # Check result structure
+        assert result.camera_id == "CAM-001"
+        assert result.recommended_settings is not None
+        assert result.recommended_settings.stream is not None
+        assert result.recommended_settings.exposure is not None
+        assert result.recommended_settings.low_light is not None
+        assert result.recommended_settings.image is not None
+        assert result.confidence is not None
+        assert result.explanation is not None
+        assert result.provider == "heuristic"
+        assert result.processing_time_seconds >= 0
 
-    def test_confidence_range(self, sample_camera, sample_capabilities, sample_context):
+    @pytest.mark.asyncio
+    async def test_confidence_range(self, provider, camera_context, capabilities, optimization_context):
         """Test that confidence is within valid range."""
-        from services.optimization import OptimizationService
-
-        service = OptimizationService()
-
-        result = service._optimize_with_heuristic(
-            sample_camera,
-            sample_capabilities,
-            {},
-            sample_context
+        result = await provider.optimize(
+            camera=camera_context,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
         )
 
-        assert 0.0 <= result["confidence"] <= 1.0
+        assert 0.0 <= result.confidence <= 1.0
+
+    @pytest.mark.asyncio
+    async def test_to_dict_serialization(self, provider, camera_context, capabilities, optimization_context):
+        """Test that result can be serialized to dict."""
+        result = await provider.optimize(
+            camera=camera_context,
+            capabilities=capabilities,
+            current_settings=None,
+            context=optimization_context,
+        )
+
+        result_dict = result.to_dict()
+
+        assert "cameraId" in result_dict
+        assert "recommendedSettings" in result_dict
+        assert "confidence" in result_dict
+        assert "warnings" in result_dict
+        assert "explanation" in result_dict
+        assert "aiProvider" in result_dict
+        assert "processingTime" in result_dict
+        assert "generatedAt" in result_dict
