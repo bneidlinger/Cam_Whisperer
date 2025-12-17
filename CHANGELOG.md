@@ -101,6 +101,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Test Results:** 56 passed, 1 skipped
 
+#### Emergency Record Feature (VMS Backup) ✅
+
+- **Created** `backend/services/emergency_record.py` (~600 lines)
+  - `EmergencyRecordService` class with singleton pattern
+  - `RecordingStatus` enum (active, paused, stopped)
+  - Async capture loop with semaphore concurrency control (max 5 concurrent)
+  - ONVIF snapshot fetching via GetSnapshotUri
+  - Auto-cleanup of old snapshots based on retention policy
+  - Session restore on server restart (auto-resume active/paused sessions)
+  - Storage statistics tracking per-site
+
+- **Added** ORM models (`backend/models/orm.py`)
+  - `EmergencyRecordSession` - Session tracking (site_id, interval, retention, status, stats)
+  - `EmergencySnapshot` - Individual snapshot records with file paths and sizes
+
+- **Added** Emergency Record configuration (`backend/config.py`)
+  - `emergency_record_enabled` - Enable/disable feature
+  - `emergency_record_storage_path` - Snapshot storage directory
+  - `emergency_record_max_storage_gb` - Storage limit (default: 10GB)
+  - `emergency_record_cleanup_interval_minutes` - Cleanup frequency
+  - `emergency_record_default_retention_hours` - Default retention (24h)
+  - `emergency_record_max_concurrent_captures` - Concurrency limit (5)
+
+- **Added** Emergency Record API endpoints
+  - `POST /api/emergency-record/start` - Start recording session
+  - `POST /api/emergency-record/stop/{site_id}` - Stop recording
+  - `POST /api/emergency-record/pause/{site_id}` - Pause recording
+  - `POST /api/emergency-record/resume/{site_id}` - Resume recording
+  - `GET /api/emergency-record/status/{site_id}` - Get session status
+  - `GET /api/emergency-record/status` - List all active sessions
+  - `GET /api/emergency-record/snapshots/{site_id}` - List snapshots
+  - `GET /api/emergency-record/snapshot/{snapshot_id}` - Get snapshot image
+  - `GET /api/emergency-record/export/{site_id}` - Download snapshots as ZIP
+  - `DELETE /api/emergency-record/snapshots/{site_id}` - Cleanup old snapshots
+  - `GET /api/emergency-record/storage` - Storage statistics
+
+- **Added** Startup/shutdown hooks in `main.py`
+  - Auto-restore active sessions on backend startup
+  - Graceful shutdown of all capture tasks
+
 #### Frontend Integration (Phase 3-5 UI) ✅
 
 - **Added** MQTT Events navigation and section (`index.html`)
@@ -137,7 +177,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TLS: `checkCameraTls()`, `toggleDiscoveryMode()`
   - WebRTC: `fetchWebRtcSessions()`, `openWebRtcSessionsModal()`, `closeWebRtcSession()`, `closeWebRtcSessionsModal()`
 
-**Frontend Total:** ~630 lines added to `index.html`
+- **Added** Emergency Record navigation and section (`index.html`)
+  - New "Emergency" nav item with recording badge
+  - Global header indicator with red pulsing "REC" badge (visible on all pages when recording)
+  - Control panel: interval selector (5s-5min), retention selector (1h-7d)
+  - Camera list display from current site
+  - Start/Stop/Pause/Resume controls
+  - Real-time stats: total captures, failed, storage used, last capture time
+  - Camera status grid with per-camera success/fail indicators
+  - Recent snapshots thumbnail grid with click-to-enlarge
+  - Export panel: Download ZIP with date range filtering
+  - Cleanup controls for old snapshot removal
+
+- **Added** Emergency Record CSS (~80 lines)
+  - `.status-indicator.recording` with red pulse animation
+  - `.emergency-record-indicator`, `.emergency-recording-badge` styles
+  - `.snapshot-thumbnail`, `.camera-status-card` grid styles
+
+- **Added** Emergency Record JavaScript (~360 lines)
+  - `startEmergencyStatusPolling()`, `fetchEmergencyStatus()` - 3s polling
+  - `updateEmergencyIndicator()`, `updateEmergencyUI()`, `resetEmergencyUI()`
+  - `updateEmergencyCameraList()`, `updateEmergencyCameraStatus()`
+  - `startEmergencyRecording()`, `stopEmergencyRecording()`, `pauseResumeEmergencyRecording()`
+  - `loadEmergencySnapshots()`, `viewEmergencySnapshot()`, `exportEmergencySnapshots()`, `cleanupEmergencySnapshots()`
+  - `initEmergencyRecord()` - Initialization on page load
+
+**Frontend Total:** ~1,200 lines added to `index.html`
 
 #### ONVIF Integration Improvements (Phase 1 & 2)
 
@@ -202,6 +267,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic capability detection during camera discovery
 
 ### Fixed
+
+- **Fixed** ONVIF authentication failing due to time sync issues
+  - Added `adjust_time=True` to `ONVIFCamera` constructor in `onvif_client.py`
+  - Resolves WS-Security timestamp validation failures with camera clock drift
+
+- **Fixed** Claude optimization 500 errors from Pydantic validation
+  - Added `@field_validator` decorators to coerce int values to strings
+  - `gainLimit`, `wdrLevel`, `irIntensity` now accept both int and string inputs
+  - Claude Vision sometimes returns integers for these fields
+
+- **Fixed** Camera Bay JSON display - now shows formatted, readable output
+  - Created `formatCapabilities()` function with category groupings
+  - Created `formatCurrentSettingsForBay()` function for settings display
+  - Replaced raw JSON `<pre>` tags with organized sections
 
 - **Fixed** `CameraCapabilities.from_dict()` None value handling
   - Now properly defaults to safe values when dict contains `null`
@@ -974,7 +1053,8 @@ None - First alpha release
 
 ## Version History
 
-- **v0.5.0** (Unreleased) - ONVIF Phases 3-5: WebRTC, Profile M, Security
+- **v0.6.0** (Unreleased) - Emergency Record, Bug Fixes, UI Improvements
+- **v0.5.0** (2025-12-16) - ONVIF Phases 3-5: WebRTC, Profile M, Security
 - **v0.4.0** (2025-12-07) - Optimization Pipeline Infrastructure
 - **v0.3.2** (2025-12-07) - Rebrand to PlatoniCam + Project Organization
 - **v0.3.1** (2025-12-07) - Sites/Projects + Dual Licensing
@@ -1029,4 +1109,4 @@ None - First alpha release
 
 **Maintained by:** PlatoniCam Development Team
 **Last Updated:** 2025-12-16
-**Current Version:** 0.5.0-dev (Unreleased)
+**Current Version:** 0.6.0-dev (Unreleased)

@@ -467,9 +467,12 @@ class ONVIFClient:
 
         try:
             loop = asyncio.get_event_loop()
+            # Note: adjust_time=True is critical for authentication
+            # ONVIF uses WS-Security with timestamps, and time drift between
+            # client and camera causes auth failures even with correct credentials
             camera = await loop.run_in_executor(
                 self.executor,
-                lambda: ONVIFCamera(ip, port, username, password)
+                lambda: ONVIFCamera(ip, port, username, password, adjust_time=True)
             )
 
             # Cache the connection

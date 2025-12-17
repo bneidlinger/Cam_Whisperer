@@ -52,3 +52,5 @@ node_modules/
 
 # Claude Code local settings
 .claude/settings.local.json
+nul
+backend/nul

@@ -91,6 +91,14 @@ class Settings(BaseSettings):
     mqtt_client_id: str = ""  # Auto-generated if empty
     mqtt_topic_prefix: str = "platonicam"
 
+    # Emergency Recording Configuration
+    emergency_record_enabled: bool = True
+    emergency_record_storage_path: str = "./emergency_snapshots"
+    emergency_record_max_storage_gb: float = 10.0
+    emergency_record_cleanup_interval_minutes: int = 60
+    emergency_record_default_retention_hours: int = 24
+    emergency_record_max_concurrent_captures: int = 5
+
     class Config:
         env_file = ".env"
         case_sensitive = False

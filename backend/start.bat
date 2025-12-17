@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 
 echo.
 echo  ============================================================
-echo   CAMOPT AI v0.2 - STARTUP SEQUENCE
+echo   PLATONICAM v0.6 - STARTUP SEQUENCE
 echo  ============================================================
 echo.
 
@@ -90,7 +90,7 @@ echo.
 
 REM Start frontend server in background
 echo        Starting frontend server on port 3000...
-start "CamOpt Frontend" /min cmd /c "cd /d "%PROJECT_ROOT%" && python -m http.server 3000 2>nul"
+start "PlatoniCam Frontend" /min cmd /c "cd /d "%PROJECT_ROOT%" && python -m http.server 3000 2>nul"
 timeout /t 1 /nobreak >nul
 
 REM Open browser to frontend
@@ -100,7 +100,7 @@ start "" "http://localhost:3000"
 
 echo.
 echo  ============================================================
-echo   CAMOPT AI SERVICES RUNNING
+echo   PLATONICAM SERVICES RUNNING
 echo  ============================================================
 echo.
 echo   Frontend:  http://localhost:3000
@@ -108,7 +108,7 @@ echo   Backend:   http://localhost:8000
 echo   API Docs:  http://localhost:8000/docs
 echo.
 echo   Press Ctrl+C to stop the backend server
-echo   Close the "CamOpt Frontend" window to stop frontend
+echo   Close the "PlatoniCam Frontend" window to stop frontend
 echo  ============================================================
 echo.
 
@@ -121,7 +121,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 REM Cleanup: Kill frontend server when backend stops
 echo.
 echo  Shutting down frontend server...
-taskkill /FI "WINDOWTITLE eq CamOpt Frontend*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq PlatoniCam Frontend*" /F >nul 2>&1
 
 echo  All services stopped.
 pause

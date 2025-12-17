@@ -137,6 +137,88 @@
       50% { opacity: 0.6; }
     }
 
+    /* Recording indicator - red pulsing for emergency mode */
+    .status-indicator.recording {
+      background: var(--red-alert);
+      box-shadow:
+        0 0 10px var(--red-alert),
+        0 0 20px var(--red-alert),
+        inset 0 0 5px rgba(255, 255, 255, 0.5);
+      animation: pulse-recording 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-recording {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    .emergency-record-indicator {
+      background: rgba(255, 68, 68, 0.1);
+      border: 1px solid var(--red-alert);
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+
+    .emergency-recording-badge {
+      background: var(--red-alert);
+      animation: pulse-recording 1s ease-in-out infinite;
+    }
+
+    /* Emergency section specific styles */
+    .snapshot-thumbnail {
+      position: relative;
+      aspect-ratio: 16/9;
+      overflow: hidden;
+      border: 1px solid var(--orange-dark);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .snapshot-thumbnail:hover {
+      border-color: var(--orange-primary);
+    }
+
+    .snapshot-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .snapshot-thumbnail-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 4px 8px;
+      font-size: 0.65rem;
+    }
+
+    .snapshot-thumbnail-camera {
+      color: var(--orange-glow);
+    }
+
+    .snapshot-thumbnail-time {
+      color: var(--text-dim);
+    }
+
+    .camera-status-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--orange-dark);
+      border-radius: 4px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .camera-status-card.active {
+      border-color: var(--green-terminal);
+    }
+
+    .camera-status-card.failed {
+      border-color: var(--red-alert);
+    }
+
     .header-stats {
       display: flex;
       gap: 20px;
@@ -1331,6 +1413,11 @@
           <span>HEALTH:</span>
           <span class="header-stat-value" id="health-status">--</span>
         </div>
+        <div class="header-stat emergency-record-indicator" id="emergency-record-indicator" style="display: none;" title="Emergency Recording Active">
+          <span class="status-indicator recording"></span>
+          <span style="color: var(--red-alert);">REC</span>
+          <span class="header-stat-value" id="emergency-record-camera-count">0</span>
+        </div>
         <a href="landing.html" class="header-stat" style="color: var(--orange-glow); text-decoration: none; cursor: pointer;" title="Open Optimization Guide">
           <span>[?] GUIDE</span>
         </a>
@@ -1363,6 +1450,11 @@
             <span class="nav-icon">!</span>
             <span class="nav-label">Events</span>
             <span class="nav-badge" id="events-badge">0</span>
+          </div>
+          <div class="nav-item" data-section="emergency">
+            <span class="nav-icon">REC</span>
+            <span class="nav-label">Emergency</span>
+            <span class="nav-badge emergency-recording-badge" id="emergency-badge" style="display: none;"></span>
           </div>
           <div class="nav-item" data-section="calculator">
             <span class="nav-icon">=</span>
@@ -1953,6 +2045,125 @@
                   <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">
                     Connect to MQTT broker and configure cameras to see events
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== EMERGENCY RECORD SECTION ========== -->
+        <section class="section" id="section-emergency">
+          <div class="grid-2">
+            <!-- Control Panel -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Emergency Recording</div>
+                <div class="status-badge" id="emergency-status-badge">
+                  <span class="status-dot"></span>
+                  <span id="emergency-status-text">STOPPED</span>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="form-section">
+                  <div class="section-header">// Configuration</div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Capture Interval</label>
+                      <select id="emergency-interval">
+                        <option value="5">5 seconds</option>
+                        <option value="10">10 seconds</option>
+                        <option value="30" selected>30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Retention</label>
+                      <select id="emergency-retention">
+                        <option value="1">1 hour</option>
+                        <option value="6">6 hours</option>
+                        <option value="24" selected>24 hours</option>
+                        <option value="72">3 days</option>
+                        <option value="168">7 days</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-section">
+                  <div class="section-header">// Cameras (<span id="emergency-camera-count">0</span> in site)</div>
+                  <div id="emergency-camera-list" style="max-height: 200px; overflow-y: auto;">
+                    <div class="empty-state" style="padding: 20px;">
+                      <div class="empty-state-text">No cameras in current site</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="action-bar" style="margin-top: 15px;">
+                  <button type="button" class="btn" id="emergency-start-btn">Start Recording</button>
+                  <button type="button" class="btn btn-secondary" id="emergency-stop-btn" disabled>Stop</button>
+                  <button type="button" class="btn btn-secondary" id="emergency-pause-btn" disabled>Pause</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status & Stats Panel -->
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Recording Status</div>
+              </div>
+              <div class="panel-body">
+                <div class="form-section">
+                  <div class="section-header">// Statistics</div>
+                  <div class="result-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                    <div class="result-item" style="background: var(--bg-primary); padding: 15px; border-radius: 4px;">
+                      <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Total Captures</div>
+                      <div style="font-size: 1.5rem; color: var(--orange-glow);" id="emergency-stat-captures">0</div>
+                    </div>
+                    <div class="result-item" style="background: var(--bg-primary); padding: 15px; border-radius: 4px;">
+                      <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Failed</div>
+                      <div style="font-size: 1.5rem; color: var(--red-alert);" id="emergency-stat-failed">0</div>
+                    </div>
+                    <div class="result-item" style="background: var(--bg-primary); padding: 15px; border-radius: 4px;">
+                      <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Storage Used</div>
+                      <div style="font-size: 1.5rem; color: var(--text-primary);" id="emergency-stat-storage">0 MB</div>
+                    </div>
+                    <div class="result-item" style="background: var(--bg-primary); padding: 15px; border-radius: 4px;">
+                      <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Last Capture</div>
+                      <div style="font-size: 1rem; color: var(--text-primary);" id="emergency-stat-last">--</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-section" style="margin-top: 20px;">
+                  <div class="section-header">// Camera Status</div>
+                  <div id="emergency-camera-status-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;">
+                    <div class="empty-state" style="padding: 20px; grid-column: 1 / -1;">
+                      <div class="empty-state-text">Start recording to see camera status</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Snapshots Panel -->
+          <div class="panel" style="margin-top: 20px;">
+            <div class="panel-header">
+              <div class="panel-title">Recent Snapshots</div>
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-sm btn-secondary" id="emergency-export-btn" disabled>Export ZIP</button>
+                <button class="btn btn-sm btn-secondary" id="emergency-cleanup-btn" disabled>Cleanup Old</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="emergency-snapshots-grid" class="snapshot-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;">
+              </div>
+              <div id="emergency-snapshots-empty" class="empty-state" style="padding: 40px;">
+                <div class="empty-state-icon">CAM</div>
+                <div class="empty-state-text">No snapshots captured yet</div>
+                <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">
+                  Start emergency recording to capture snapshots
                 </div>
               </div>
             </div>
@@ -3692,14 +3903,14 @@
           ${cam.capabilities ? `
             <div>
               <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">// CAPABILITIES</div>
-              <pre style="background: var(--bg-primary); padding: 10px; border-radius: 4px; font-size: 0.75rem; overflow: auto; max-height: 200px;">${escapeHtml(JSON.stringify(cam.capabilities, null, 2))}</pre>
+              ${formatCapabilities(cam.capabilities)}
             </div>
           ` : ''}
 
           ${cam.currentSettings ? `
             <div>
               <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">// CURRENT SETTINGS</div>
-              <pre style="background: var(--bg-primary); padding: 10px; border-radius: 4px; font-size: 0.75rem; overflow: auto; max-height: 200px;">${escapeHtml(JSON.stringify(cam.currentSettings, null, 2))}</pre>
+              ${formatCurrentSettingsForBay(cam.currentSettings)}
             </div>
           ` : ''}
         </div>
@@ -3959,11 +4170,286 @@
       }
     };
 
+    // Capability categories for camera bay display
+    const CAPABILITIES_CATEGORIES = {
+      device: {
+        label: 'Device Information',
+        icon: '[i]',
+        fields: {
+          manufacturer: 'Manufacturer',
+          vendor: 'Vendor',
+          model: 'Model',
+          firmware: 'Firmware',
+          serial: 'Serial Number',
+          hardware_id: 'Hardware ID'
+        }
+      },
+      streaming: {
+        label: 'Streaming Capabilities',
+        icon: '[>]',
+        fields: {
+          max_resolution: 'Max Resolution',
+          maxResolution: 'Max Resolution',
+          supported_codecs: 'Supported Codecs',
+          codecs: 'Codecs',
+          supportedCodecs: 'Supported Codecs',
+          max_fps: 'Max FPS',
+          maxFps: 'Max FPS',
+          resolutions: 'Resolutions'
+        }
+      },
+      profiles: {
+        label: 'ONVIF Profiles',
+        icon: '[P]',
+        fields: {
+          profile_t_supported: 'Profile T',
+          profile_s_supported: 'Profile S',
+          media2_supported: 'Media2 Service',
+          h265_supported: 'H.265/HEVC',
+          h265_profiles: 'H.265 Profiles',
+          max_h265_resolution: 'Max H.265 Resolution'
+        }
+      },
+      services: {
+        label: 'Available Services',
+        icon: '[S]',
+        fields: {
+          has_imaging_service: 'Imaging Service',
+          analytics: 'Analytics',
+          ptz: 'PTZ Control',
+          events: 'Events'
+        }
+      }
+    };
+
+    // Current settings categories for camera bay display
+    const CURRENT_SETTINGS_CATEGORIES = {
+      stream: {
+        label: 'Stream Configuration',
+        icon: '[>]',
+        fields: {
+          resolution: 'Resolution',
+          codec: 'Codec',
+          fps: 'Frame Rate',
+          bitrateMbps: 'Bitrate (Mbps)'
+        }
+      },
+      exposure: {
+        label: 'Exposure Settings',
+        icon: '[O]',
+        fields: {
+          mode: 'Mode',
+          shutter: 'Shutter',
+          iris: 'Iris',
+          gainLimit: 'Gain Limit',
+          wdr: 'WDR',
+          wdrLevel: 'WDR Level'
+        }
+      },
+      lowLight: {
+        label: 'Low-Light Settings',
+        icon: '[*]',
+        fields: {
+          irMode: 'IR Mode',
+          dayNightMode: 'Day/Night',
+          noiseReduction: 'Noise Reduction'
+        }
+      },
+      image: {
+        label: 'Image Quality',
+        icon: '[#]',
+        fields: {
+          brightness: 'Brightness',
+          contrast: 'Contrast',
+          saturation: 'Saturation',
+          sharpness: 'Sharpness'
+        }
+      }
+    };
+
     function formatSettingValue(value) {
       if (value === null || value === undefined) return '—';
       if (typeof value === 'boolean') return value ? 'ON' : 'OFF';
+      if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '—';
       if (typeof value === 'number') return value.toString();
       return String(value);
+    }
+
+    function formatCapabilities(capabilities) {
+      if (!capabilities) return '<div style="color: var(--text-dim);">No capabilities data</div>';
+
+      let html = '<div class="settings-report" style="padding: 0;">';
+
+      // Process device info first (might be nested or flat)
+      const deviceData = capabilities.device || {
+        manufacturer: capabilities.vendor || capabilities.manufacturer,
+        model: capabilities.model,
+        firmware: capabilities.firmware,
+        serial: capabilities.serial || capabilities.serialNumber
+      };
+
+      // Build flat capability data for easier processing
+      const flatCaps = {
+        device: deviceData,
+        streaming: {
+          max_resolution: capabilities.max_resolution || capabilities.maxResolution,
+          codecs: capabilities.codecs || capabilities.supported_codecs || capabilities.supportedCodecs,
+          max_fps: capabilities.max_fps || capabilities.maxFps,
+          resolutions: capabilities.resolutions
+        },
+        profiles: {
+          profile_t_supported: capabilities.profile_t_supported,
+          profile_s_supported: capabilities.profile_s_supported,
+          media2_supported: capabilities.media2_supported,
+          h265_supported: capabilities.h265_supported,
+          h265_profiles: capabilities.h265_profiles,
+          max_h265_resolution: capabilities.max_h265_resolution
+        },
+        services: {
+          has_imaging_service: capabilities.has_imaging_service,
+          analytics: capabilities.service_capabilities?.analytics,
+          ptz: capabilities.service_capabilities?.ptz,
+          events: capabilities.service_capabilities?.events
+        }
+      };
+
+      for (const [catKey, category] of Object.entries(CAPABILITIES_CATEGORIES)) {
+        const catData = flatCaps[catKey];
+        if (!catData) continue;
+
+        const items = [];
+        for (const [fieldKey, fieldLabel] of Object.entries(category.fields)) {
+          const value = catData[fieldKey];
+          if (value !== undefined && value !== null && value !== '') {
+            items.push({ label: fieldLabel, value: formatSettingValue(value) });
+          }
+        }
+
+        if (items.length === 0) continue;
+
+        html += `
+          <div class="settings-category">
+            <div class="settings-category-header">
+              <span class="settings-category-icon">${category.icon}</span>
+              ${category.label}
+            </div>
+            <div class="settings-grid">
+              ${items.map(item => `
+                <div class="settings-item">
+                  <span class="settings-item-label">${escapeHtml(item.label)}</span>
+                  <span class="settings-item-value">${escapeHtml(item.value)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+      }
+
+      // Show video encoder details if available
+      if (capabilities.video_encoders && capabilities.video_encoders.length > 0) {
+        const encoder = capabilities.video_encoders[0];
+        html += `
+          <div class="settings-category">
+            <div class="settings-category-header">
+              <span class="settings-category-icon">[E]</span>
+              Primary Encoder
+            </div>
+            <div class="settings-grid">
+              <div class="settings-item">
+                <span class="settings-item-label">Name</span>
+                <span class="settings-item-value">${escapeHtml(encoder.name || '—')}</span>
+              </div>
+              <div class="settings-item">
+                <span class="settings-item-label">Encoding</span>
+                <span class="settings-item-value">${escapeHtml(encoder.encoding || '—')}</span>
+              </div>
+              <div class="settings-item">
+                <span class="settings-item-label">Resolution</span>
+                <span class="settings-item-value">${encoder.resolution ? encoder.resolution.width + 'x' + encoder.resolution.height : '—'}</span>
+              </div>
+              <div class="settings-item">
+                <span class="settings-item-label">FPS</span>
+                <span class="settings-item-value">${encoder.fps || '—'}</span>
+              </div>
+              <div class="settings-item">
+                <span class="settings-item-label">Bitrate</span>
+                <span class="settings-item-value">${encoder.bitrate_limit ? (encoder.bitrate_limit / 1000).toFixed(1) + ' Mbps' : '—'}</span>
+              </div>
+              <div class="settings-item">
+                <span class="settings-item-label">Quality</span>
+                <span class="settings-item-value">${encoder.quality || '—'}</span>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      // Show media profiles if available
+      if (capabilities.media_profiles && capabilities.media_profiles.length > 0) {
+        html += `
+          <div class="settings-category">
+            <div class="settings-category-header">
+              <span class="settings-category-icon">[M]</span>
+              Media Profiles (${capabilities.media_profiles.length})
+            </div>
+            <div class="settings-grid">
+              ${capabilities.media_profiles.slice(0, 4).map(p => `
+                <div class="settings-item">
+                  <span class="settings-item-label">${escapeHtml(p.name || p.token)}</span>
+                  <span class="settings-item-value">${escapeHtml(p.resolution || p.encoding || '—')}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function formatCurrentSettingsForBay(currentSettings) {
+      if (!currentSettings) return '<div style="color: var(--text-dim);">No settings data</div>';
+
+      let html = '<div class="settings-report" style="padding: 0;">';
+
+      for (const [catKey, category] of Object.entries(CURRENT_SETTINGS_CATEGORIES)) {
+        const catData = currentSettings[catKey];
+        if (!catData || typeof catData !== 'object') continue;
+
+        const items = [];
+        for (const [fieldKey, fieldLabel] of Object.entries(category.fields)) {
+          const value = catData[fieldKey];
+          if (value !== undefined && value !== null && value !== '' && value !== 'Unknown') {
+            items.push({ label: fieldLabel, value: formatSettingValue(value) });
+          }
+        }
+        // Capture additional fields not in predefined list
+        for (const [key, value] of Object.entries(catData)) {
+          if (!category.fields[key] && value !== undefined && value !== null && value !== '' && value !== 'Unknown') {
+            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+            items.push({ label, value: formatSettingValue(value) });
+          }
+        }
+
+        if (items.length === 0) continue;
+
+        html += `
+          <div class="settings-category">
+            <div class="settings-category-header">
+              <span class="settings-category-icon">${category.icon}</span>
+              ${category.label}
+            </div>
+            <div class="settings-grid">
+              ${items.map(item => `
+                <div class="settings-item">
+                  <span class="settings-item-label">${escapeHtml(item.label)}</span>
+                  <span class="settings-item-value">${escapeHtml(item.value)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+      }
+
+      html += '</div>';
+      return html || '<div style="color: var(--text-dim);">No settings data available</div>';
     }
 
     function formatSettingsReport(result) {
@@ -5509,8 +5995,370 @@
       if (e.target.id === 'webrtc-sessions-modal') closeWebRtcSessionsModal();
     });
 
+    // ---- Emergency Record ----
+    let emergencyStatusInterval = null;
+    let emergencyRecordingActive = false;
+
+    function startEmergencyStatusPolling() {
+      if (emergencyStatusInterval) return;
+      emergencyStatusInterval = setInterval(fetchEmergencyStatus, 3000);
+      fetchEmergencyStatus();
+    }
+
+    function stopEmergencyStatusPolling() {
+      if (emergencyStatusInterval) {
+        clearInterval(emergencyStatusInterval);
+        emergencyStatusInterval = null;
+      }
+    }
+
+    async function fetchEmergencyStatus() {
+      const site = getCurrentSite();
+      if (!site) {
+        updateEmergencyIndicator(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/emergency-record/status/${site.id}`);
+        const status = await response.json();
+
+        if (status.active) {
+          emergencyRecordingActive = true;
+          updateEmergencyUI(status);
+          updateEmergencyIndicator(true, status.camera_count || status.cameras?.length || 0);
+        } else {
+          emergencyRecordingActive = false;
+          updateEmergencyIndicator(false);
+          resetEmergencyUI();
+        }
+      } catch (error) {
+        console.error('Failed to fetch emergency status:', error);
+      }
+    }
+
+    function updateEmergencyIndicator(active, cameraCount = 0) {
+      const indicator = document.getElementById('emergency-record-indicator');
+      const badge = document.getElementById('emergency-badge');
+
+      if (active) {
+        indicator.style.display = 'flex';
+        badge.style.display = 'inline';
+        badge.textContent = '';
+        document.getElementById('emergency-record-camera-count').textContent = cameraCount;
+      } else {
+        indicator.style.display = 'none';
+        badge.style.display = 'none';
+      }
+    }
+
+    function updateEmergencyUI(status) {
+      // Update status badge
+      const statusBadge = document.getElementById('emergency-status-badge');
+      const statusText = document.getElementById('emergency-status-text');
+
+      if (status.status === 'active') {
+        statusBadge.className = 'status-badge connected';
+        statusText.textContent = 'RECORDING';
+      } else if (status.status === 'paused') {
+        statusBadge.className = 'status-badge connecting';
+        statusText.textContent = 'PAUSED';
+      } else {
+        statusBadge.className = 'status-badge disconnected';
+        statusText.textContent = 'STOPPED';
+      }
+
+      // Update stats
+      if (status.stats) {
+        document.getElementById('emergency-stat-captures').textContent = status.stats.total_captures || 0;
+        document.getElementById('emergency-stat-failed').textContent = status.stats.failed_captures || 0;
+        document.getElementById('emergency-stat-storage').textContent = `${status.stats.storage_mb || 0} MB`;
+
+        if (status.stats.last_capture_at) {
+          const lastCapture = new Date(status.stats.last_capture_at);
+          document.getElementById('emergency-stat-last').textContent = lastCapture.toLocaleTimeString();
+        }
+      }
+
+      // Update buttons
+      document.getElementById('emergency-start-btn').disabled = true;
+      document.getElementById('emergency-stop-btn').disabled = false;
+      document.getElementById('emergency-pause-btn').disabled = status.status === 'paused';
+      document.getElementById('emergency-pause-btn').textContent = status.status === 'paused' ? 'Resume' : 'Pause';
+      document.getElementById('emergency-export-btn').disabled = false;
+      document.getElementById('emergency-cleanup-btn').disabled = false;
+
+      // Update camera status grid
+      if (status.cameras) {
+        updateEmergencyCameraStatus(status.cameras, status.stats);
+      }
+
+      // Load snapshots
+      loadEmergencySnapshots();
+    }
+
+    function resetEmergencyUI() {
+      document.getElementById('emergency-status-badge').className = 'status-badge disconnected';
+      document.getElementById('emergency-status-text').textContent = 'STOPPED';
+      document.getElementById('emergency-stat-captures').textContent = '0';
+      document.getElementById('emergency-stat-failed').textContent = '0';
+      document.getElementById('emergency-stat-storage').textContent = '0 MB';
+      document.getElementById('emergency-stat-last').textContent = '--';
+
+      document.getElementById('emergency-start-btn').disabled = false;
+      document.getElementById('emergency-stop-btn').disabled = true;
+      document.getElementById('emergency-pause-btn').disabled = true;
+      document.getElementById('emergency-pause-btn').textContent = 'Pause';
+      document.getElementById('emergency-export-btn').disabled = true;
+      document.getElementById('emergency-cleanup-btn').disabled = true;
+    }
+
+    function updateEmergencyCameraList() {
+      const cameras = getCurrentCameras();
+      const container = document.getElementById('emergency-camera-list');
+      const countSpan = document.getElementById('emergency-camera-count');
+
+      countSpan.textContent = cameras.length;
+
+      if (cameras.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding: 20px;">
+            <div class="empty-state-text">No cameras in current site</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = cameras.map(cam => `
+        <div style="display: flex; align-items: center; padding: 8px; background: var(--bg-primary); border-radius: 4px; margin-bottom: 5px;">
+          <span style="color: var(--orange-glow); margin-right: 10px;">${escapeHtml(cam.id)}</span>
+          <span style="color: var(--text-dim);">${escapeHtml(cam.ip)}</span>
+          ${cam.username ? '<span style="color: var(--green-terminal); margin-left: auto; font-size: 0.7rem;">AUTH</span>' : '<span style="color: var(--red-alert); margin-left: auto; font-size: 0.7rem;">NO AUTH</span>'}
+        </div>
+      `).join('');
+    }
+
+    function updateEmergencyCameraStatus(cameras, stats) {
+      const container = document.getElementById('emergency-camera-status-grid');
+
+      container.innerHTML = cameras.map(cam => `
+        <div class="camera-status-card ${stats?.cameras_active > 0 ? 'active' : 'failed'}">
+          <div style="font-size: 0.75rem; color: var(--orange-glow); margin-bottom: 5px;">${escapeHtml(cam.name || cam.id)}</div>
+          <div style="font-size: 0.65rem; color: var(--text-dim);">${escapeHtml(cam.ip)}</div>
+        </div>
+      `).join('');
+    }
+
+    async function loadEmergencySnapshots() {
+      const site = getCurrentSite();
+      if (!site) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/emergency-record/snapshots/${site.id}?limit=20`);
+        const data = await response.json();
+
+        const grid = document.getElementById('emergency-snapshots-grid');
+        const empty = document.getElementById('emergency-snapshots-empty');
+
+        if (data.snapshots && data.snapshots.length > 0) {
+          empty.style.display = 'none';
+          grid.innerHTML = data.snapshots.map(snap => `
+            <div class="snapshot-thumbnail" onclick="viewEmergencySnapshot(${snap.id})">
+              <img src="${API_BASE}/api/emergency-record/snapshot/${snap.id}" alt="Snapshot" loading="lazy" />
+              <div class="snapshot-thumbnail-overlay">
+                <div class="snapshot-thumbnail-camera">${escapeHtml(snap.camera_id)}</div>
+                <div class="snapshot-thumbnail-time">${new Date(snap.captured_at).toLocaleTimeString()}</div>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          empty.style.display = 'block';
+          grid.innerHTML = '';
+        }
+      } catch (error) {
+        console.error('Failed to load snapshots:', error);
+      }
+    }
+
+    function viewEmergencySnapshot(snapshotId) {
+      window.open(`${API_BASE}/api/emergency-record/snapshot/${snapshotId}`, '_blank');
+    }
+
+    async function startEmergencyRecording() {
+      const site = getCurrentSite();
+      if (!site) {
+        showToast('No site selected');
+        return;
+      }
+
+      const cameras = getCurrentCameras().filter(cam => cam.username && cam.password);
+      if (cameras.length === 0) {
+        showToast('No cameras with credentials in current site');
+        return;
+      }
+
+      const interval = parseInt(document.getElementById('emergency-interval').value);
+      const retention = parseInt(document.getElementById('emergency-retention').value);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/emergency-record/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            site_id: site.id,
+            cameras: cameras.map(cam => ({
+              id: cam.id,
+              ip: cam.ip,
+              port: cam.port || 80,
+              username: cam.username,
+              password: cam.password,
+              name: cam.name || cam.id
+            })),
+            interval_seconds: interval,
+            retention_hours: retention
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast('Emergency recording started');
+          startEmergencyStatusPolling();
+          fetchEmergencyStatus();
+        } else {
+          showToast(result.message || 'Failed to start recording');
+        }
+      } catch (error) {
+        console.error('Failed to start emergency recording:', error);
+        showToast('Failed to start recording');
+      }
+    }
+
+    async function stopEmergencyRecording() {
+      const site = getCurrentSite();
+      if (!site) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/emergency-record/stop/${site.id}`, {
+          method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast('Emergency recording stopped');
+          emergencyRecordingActive = false;
+          updateEmergencyIndicator(false);
+          resetEmergencyUI();
+        }
+      } catch (error) {
+        console.error('Failed to stop emergency recording:', error);
+        showToast('Failed to stop recording');
+      }
+    }
+
+    async function pauseResumeEmergencyRecording() {
+      const site = getCurrentSite();
+      if (!site) return;
+
+      const isPaused = document.getElementById('emergency-pause-btn').textContent === 'Resume';
+      const endpoint = isPaused ? 'resume' : 'pause';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/emergency-record/${endpoint}/${site.id}`, {
+          method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(`Recording ${isPaused ? 'resumed' : 'paused'}`);
+          fetchEmergencyStatus();
+        }
+      } catch (error) {
+        console.error(`Failed to ${endpoint} emergency recording:`, error);
+      }
+    }
+
+    async function exportEmergencySnapshots() {
+      const site = getCurrentSite();
+      if (!site) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/emergency-record/export/${site.id}`);
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `emergency_snapshots_${site.id}.zip`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          showToast('Export downloaded');
+        } else {
+          showToast('No snapshots to export');
+        }
+      } catch (error) {
+        console.error('Failed to export snapshots:', error);
+        showToast('Export failed');
+      }
+    }
+
+    async function cleanupEmergencySnapshots() {
+      const site = getCurrentSite();
+      if (!site) return;
+
+      const retention = parseInt(document.getElementById('emergency-retention').value);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/emergency-record/snapshots/${site.id}?older_than_hours=${retention}`, {
+          method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(`Cleaned up ${result.deleted_count} snapshots (${result.freed_mb} MB freed)`);
+          loadEmergencySnapshots();
+        }
+      } catch (error) {
+        console.error('Failed to cleanup snapshots:', error);
+        showToast('Cleanup failed');
+      }
+    }
+
+    // Emergency Record Event Listeners
+    document.getElementById('emergency-start-btn')?.addEventListener('click', startEmergencyRecording);
+    document.getElementById('emergency-stop-btn')?.addEventListener('click', stopEmergencyRecording);
+    document.getElementById('emergency-pause-btn')?.addEventListener('click', pauseResumeEmergencyRecording);
+    document.getElementById('emergency-export-btn')?.addEventListener('click', exportEmergencySnapshots);
+    document.getElementById('emergency-cleanup-btn')?.addEventListener('click', cleanupEmergencySnapshots);
+
+    // Update camera list when Emergency section is shown
+    document.querySelector('.nav-item[data-section="emergency"]')?.addEventListener('click', () => {
+      updateEmergencyCameraList();
+      if (emergencyRecordingActive) {
+        fetchEmergencyStatus();
+      }
+    });
+
+    // Check for active recording on page load
+    function initEmergencyRecord() {
+      const site = getCurrentSite();
+      if (site) {
+        fetchEmergencyStatus().then(() => {
+          if (emergencyRecordingActive) {
+            startEmergencyStatusPolling();
+          }
+        });
+      }
+    }
+
     // ---- Initialize ----
     loadState();
+    initEmergencyRecord();
   </script>
 </body>
 </html>

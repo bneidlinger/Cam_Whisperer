@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any, List
 from sqlalchemy import (
     Column,
     Integer,
+    BigInteger,
     String,
     Text,
     Float,
@@ -382,4 +383,130 @@ class AppliedConfig(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "applied_at": self.applied_at.isoformat() if self.applied_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
+class EmergencyRecordSession(Base):
+    """
+    Tracks active and historical emergency recording sessions.
+    Used for backup snapshot capture when main VMS is down.
+    """
+
+    __tablename__ = "emergency_record_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(64), unique=True, nullable=False, index=True)
+    site_id = Column(String(64), nullable=False, index=True)
+
+    # Configuration
+    interval_seconds = Column(Integer, nullable=False)  # 5, 10, 30, 60, 300
+    retention_hours = Column(Integer, default=24)
+    storage_path = Column(Text, nullable=False)
+
+    # Camera list as JSON (snapshot of cameras at session start)
+    cameras_json = Column(JSON, nullable=False)
+
+    # Status: active, paused, stopped
+    status = Column(String(32), default="active", nullable=False)
+
+    # Stats
+    total_captures = Column(Integer, default=0)
+    failed_captures = Column(Integer, default=0)
+    storage_bytes = Column(BigInteger, default=0)
+
+    # Timestamps
+    started_at = Column(DateTime, default=func.now())
+    paused_at = Column(DateTime, nullable=True)
+    stopped_at = Column(DateTime, nullable=True)
+    last_capture_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    snapshots = relationship(
+        "EmergencySnapshot",
+        back_populates="session",
+        cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("idx_session_site_status", "site_id", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<EmergencyRecordSession({self.session_id} - site={self.site_id}, status={self.status})>"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "site_id": self.site_id,
+            "interval_seconds": self.interval_seconds,
+            "retention_hours": self.retention_hours,
+            "storage_path": self.storage_path,
+            "cameras": self.cameras_json,
+            "status": self.status,
+            "total_captures": self.total_captures,
+            "failed_captures": self.failed_captures,
+            "storage_bytes": self.storage_bytes,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "paused_at": self.paused_at.isoformat() if self.paused_at else None,
+            "stopped_at": self.stopped_at.isoformat() if self.stopped_at else None,
+            "last_capture_at": self.last_capture_at.isoformat() if self.last_capture_at else None,
+        }
+
+
+class EmergencySnapshot(Base):
+    """
+    Individual snapshot records for emergency recording.
+    References the session and stores file location.
+    """
+
+    __tablename__ = "emergency_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(
+        Integer,
+        ForeignKey("emergency_record_sessions.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    # Camera info
+    camera_id = Column(String(64), nullable=False)
+    camera_ip = Column(String(45), nullable=False)
+
+    # Capture info
+    captured_at = Column(DateTime, default=func.now(), index=True)
+    file_path = Column(Text, nullable=False)  # Relative to storage_path
+    file_size_bytes = Column(Integer, nullable=False)
+    media_type = Column(String(32), default="image/jpeg")
+
+    # Status
+    success = Column(Boolean, default=True)
+    error_message = Column(Text, nullable=True)
+
+    # Relationships
+    session = relationship("EmergencyRecordSession", back_populates="snapshots")
+
+    __table_args__ = (
+        Index("idx_snapshot_session_time", "session_id", "captured_at"),
+        Index("idx_snapshot_camera", "camera_id"),
+    )
+
+    def __repr__(self) -> str:
+        status = "ok" if self.success else "failed"
+        return f"<EmergencySnapshot({self.id} - camera={self.camera_id}, {status})>"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "camera_id": self.camera_id,
+            "camera_ip": self.camera_ip,
+            "captured_at": self.captured_at.isoformat() if self.captured_at else None,
+            "file_path": self.file_path,
+            "file_size_bytes": self.file_size_bytes,
+            "media_type": self.media_type,
+            "success": self.success,
+            "error_message": self.error_message,
         }

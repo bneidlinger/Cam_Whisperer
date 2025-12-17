@@ -1,21 +1,23 @@
 # backend/main.py
 
 # Suppress ResourceWarning from wsdiscovery library (unclosed sockets in daemon threads)
-# Must be done before any other imports, using simplefilter for thread safety
+# Must be done before any other imports
 import warnings
 import sys
 
 # Aggressively suppress ResourceWarnings (wsdiscovery has socket cleanup issues in threads)
-if not sys.warnoptions:
-    warnings.simplefilter("ignore", ResourceWarning)
-else:
-    warnings.filterwarnings("ignore", category=ResourceWarning)
+# Apply unconditionally - wsdiscovery's daemon threads don't clean up sockets properly
+warnings.filterwarnings("ignore", category=ResourceWarning)
+warnings.filterwarnings("ignore", message="unclosed.*socket")
+warnings.filterwarnings("ignore", module="wsdiscovery")
+warnings.filterwarnings("ignore", module="wsdiscovery.threaded")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+from pathlib import Path
 import datetime
 import logging
 import traceback
@@ -27,6 +29,7 @@ from services.discovery import DiscoveryService
 from services.apply import ApplyService, ApplyMethod
 from services.datasheet_service import get_datasheet_service
 from services.camera_service import get_camera_service
+from services.emergency_record import get_emergency_record_service
 from utils.rate_limiter import get_discovery_rate_limiter, RateLimitError
 from utils.network_filter import get_network_filter, configure_network_filter, get_known_camera_ouis
 
@@ -114,6 +117,32 @@ async def startup_event():
         logger.warning("No Anthropic API key configured! Will use heuristic fallback only.")
         logger.warning("Set ANTHROPIC_API_KEY in .env file to enable Claude Vision.")
 
+    # Initialize emergency record service and restore sessions
+    if settings.emergency_record_enabled:
+        try:
+            emergency_service = get_emergency_record_service()
+            await emergency_service.restore_sessions()
+            logger.info("Emergency record service initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize emergency record service: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Application shutdown - cleanup background services"""
+    logger.info("PlatoniCam Backend Shutting Down")
+
+    # Stop emergency recording sessions gracefully
+    if settings.emergency_record_enabled:
+        try:
+            emergency_service = get_emergency_record_service()
+            await emergency_service.shutdown()
+            logger.info("Emergency record service shutdown complete")
+        except Exception as e:
+            logger.error(f"Error during emergency record shutdown: {e}")
+
+    logger.info("Shutdown complete")
+
 # ---- Pydantic models ----
 
 class CameraRecord(BaseModel):
@@ -182,8 +211,18 @@ class ExposureSettings(BaseModel):
     iris: Optional[str] = None
     gainLimit: Optional[str] = None
     wdr: Optional[str] = None
+    wdrLevel: Optional[str] = None
     blc: Optional[str] = None
+    hlc: Optional[str] = None
     backlightComp: Optional[str] = None
+
+    @field_validator('gainLimit', 'wdrLevel', mode='before')
+    @classmethod
+    def coerce_to_str(cls, v):
+        """Coerce int/float values to str (Claude sometimes returns numbers)"""
+        if v is None:
+            return None
+        return str(v)
 
 class LowLightSettings(BaseModel):
     irMode: Optional[str] = None
@@ -192,6 +231,15 @@ class LowLightSettings(BaseModel):
     dnr: Optional[str] = None
     noiseReduction: Optional[str] = None
     slowShutter: Optional[str] = None
+    sensitivity: Optional[str] = None
+
+    @field_validator('irIntensity', mode='before')
+    @classmethod
+    def coerce_to_str(cls, v):
+        """Coerce int/float values to str (Claude sometimes returns numbers)"""
+        if v is None:
+            return None
+        return str(v)
 
 class ImageSettings(BaseModel):
     sharpness: Optional[int] = None
@@ -1752,6 +1800,282 @@ async def list_apply_jobs(
         "offset": offset,
         "limit": limit,
     }
+
+
+# ---- Emergency Record Endpoints ----
+
+class EmergencyRecordStartRequest(BaseModel):
+    site_id: str
+    cameras: List[Dict[str, Any]]  # [{id, ip, port, username, password}]
+    interval_seconds: int = 30  # 5, 10, 30, 60, 300
+    retention_hours: int = 24
+
+
+class EmergencyRecordResponse(BaseModel):
+    success: bool
+    message: str
+    session: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/emergency-record/start")
+async def start_emergency_recording(req: EmergencyRecordStartRequest):
+    """Start emergency snapshot recording for a site."""
+    try:
+        service = get_emergency_record_service()
+        session = await service.start_recording(
+            site_id=req.site_id,
+            cameras=req.cameras,
+            interval_seconds=req.interval_seconds,
+            retention_hours=req.retention_hours,
+        )
+        return {"success": True, "message": "Recording started", "session": session}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to start emergency recording: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/emergency-record/stop/{site_id}")
+async def stop_emergency_recording(site_id: str):
+    """Stop emergency recording for a site."""
+    try:
+        service = get_emergency_record_service()
+        stopped = await service.stop_recording(site_id)
+        if stopped:
+            return {"success": True, "message": "Recording stopped"}
+        else:
+            raise HTTPException(status_code=404, detail=f"No active session for site {site_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to stop emergency recording: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/emergency-record/pause/{site_id}")
+async def pause_emergency_recording(site_id: str):
+    """Pause emergency recording for a site."""
+    try:
+        service = get_emergency_record_service()
+        paused = await service.pause_recording(site_id)
+        if paused:
+            return {"success": True, "message": "Recording paused"}
+        else:
+            raise HTTPException(status_code=404, detail=f"No active session for site {site_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to pause emergency recording: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/emergency-record/resume/{site_id}")
+async def resume_emergency_recording(site_id: str):
+    """Resume a paused emergency recording session."""
+    try:
+        service = get_emergency_record_service()
+        session = await service.resume_recording(site_id)
+        return {"success": True, "message": "Recording resumed", "session": session}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to resume emergency recording: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/emergency-record/status/{site_id}")
+async def get_emergency_record_status(site_id: str):
+    """Get status of emergency recording for a site."""
+    service = get_emergency_record_service()
+    session = service.get_session_status(site_id)
+    if session:
+        return {"active": session.get("status") == "active", **session}
+    return {"active": False, "session": None}
+
+
+@app.get("/api/emergency-record/status")
+async def get_all_emergency_records():
+    """Get status of all active emergency recording sessions."""
+    service = get_emergency_record_service()
+    sessions = service.get_all_sessions()
+    return {"sessions": sessions, "count": len(sessions)}
+
+
+@app.get("/api/emergency-record/snapshots/{site_id}")
+async def get_emergency_snapshots(
+    site_id: str,
+    camera_id: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    since: Optional[str] = None,
+):
+    """List snapshots from emergency recording."""
+    from models.orm import EmergencySnapshot, EmergencyRecordSession
+
+    try:
+        with get_db_session() as db:
+            query = db.query(EmergencySnapshot).join(EmergencyRecordSession).filter(
+                EmergencyRecordSession.site_id == site_id
+            )
+
+            if camera_id:
+                query = query.filter(EmergencySnapshot.camera_id == camera_id)
+
+            if since:
+                try:
+                    since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                    query = query.filter(EmergencySnapshot.captured_at >= since_dt)
+                except ValueError:
+                    pass
+
+            total = query.count()
+            snapshots = query.order_by(EmergencySnapshot.captured_at.desc()).offset(offset).limit(limit).all()
+
+            return {
+                "snapshots": [s.to_dict() for s in snapshots],
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+            }
+    except Exception as e:
+        logger.error(f"Failed to get emergency snapshots: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/emergency-record/snapshot/{snapshot_id}")
+async def get_emergency_snapshot_image(snapshot_id: int):
+    """Get a specific snapshot image as base64."""
+    from models.orm import EmergencySnapshot, EmergencyRecordSession
+    from fastapi.responses import Response
+
+    try:
+        with get_db_session() as db:
+            snapshot = db.query(EmergencySnapshot).filter(
+                EmergencySnapshot.id == snapshot_id
+            ).first()
+
+            if not snapshot:
+                raise HTTPException(status_code=404, detail="Snapshot not found")
+
+            session = db.query(EmergencyRecordSession).filter(
+                EmergencyRecordSession.id == snapshot.session_id
+            ).first()
+
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
+
+            file_path = Path(session.storage_path) / snapshot.file_path
+
+            if not file_path.exists():
+                raise HTTPException(status_code=404, detail="Snapshot file not found")
+
+            with open(file_path, "rb") as f:
+                image_data = f.read()
+
+            return Response(
+                content=image_data,
+                media_type=snapshot.media_type or "image/jpeg"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get snapshot image: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/emergency-record/export/{site_id}")
+async def export_emergency_snapshots(
+    site_id: str,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    camera_id: Optional[str] = None,
+):
+    """Download snapshots as ZIP file."""
+    from models.orm import EmergencySnapshot, EmergencyRecordSession
+    from fastapi.responses import StreamingResponse
+    import zipfile
+    import io
+
+    try:
+        with get_db_session() as db:
+            query = db.query(EmergencySnapshot).join(EmergencyRecordSession).filter(
+                EmergencyRecordSession.site_id == site_id,
+                EmergencySnapshot.success == True,
+            )
+
+            if camera_id:
+                query = query.filter(EmergencySnapshot.camera_id == camera_id)
+
+            if since:
+                try:
+                    since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                    query = query.filter(EmergencySnapshot.captured_at >= since_dt)
+                except ValueError:
+                    pass
+
+            if until:
+                try:
+                    until_dt = datetime.fromisoformat(until.replace("Z", "+00:00"))
+                    query = query.filter(EmergencySnapshot.captured_at <= until_dt)
+                except ValueError:
+                    pass
+
+            snapshots = query.order_by(EmergencySnapshot.captured_at.asc()).limit(1000).all()
+
+            if not snapshots:
+                raise HTTPException(status_code=404, detail="No snapshots found")
+
+            # Get session for storage path
+            session = db.query(EmergencyRecordSession).filter(
+                EmergencyRecordSession.site_id == site_id
+            ).first()
+
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
+
+            # Create ZIP in memory
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                for snapshot in snapshots:
+                    file_path = Path(session.storage_path) / snapshot.file_path
+                    if file_path.exists():
+                        # Use the relative path as the archive name
+                        zf.write(file_path, snapshot.file_path)
+
+            zip_buffer.seek(0)
+
+            filename = f"emergency_snapshots_{site_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.zip"
+
+            return StreamingResponse(
+                zip_buffer,
+                media_type="application/zip",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to export snapshots: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/emergency-record/snapshots/{site_id}")
+async def cleanup_emergency_snapshots(site_id: str, older_than_hours: int = 24):
+    """Manually trigger cleanup of old snapshots."""
+    try:
+        service = get_emergency_record_service()
+        result = await service.cleanup_old_snapshots(site_id, older_than_hours)
+        return {"success": True, **result}
+    except Exception as e:
+        logger.error(f"Failed to cleanup snapshots: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/emergency-record/storage")
+async def get_emergency_storage_stats():
+    """Get storage usage statistics."""
+    service = get_emergency_record_service()
+    return service.get_storage_stats()
 
 
 # ---- WebRTC Endpoints (Phase 3) ----
