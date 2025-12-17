@@ -813,6 +813,7 @@ async def optimize_camera(req: OptimizeRequest):
     Generate optimal camera settings using Claude Vision AI.
 
     Falls back to heuristic engine if AI is unavailable.
+    Automatically looks up datasheet specs if available.
     """
     logger.info(f"Optimization request for camera: {req.camera.id}")
 
@@ -825,6 +826,23 @@ async def optimize_camera(req: OptimizeRequest):
         capabilities_dict = req.capabilities.model_dump()
         current_settings_dict = req.currentSettings.model_dump() if req.currentSettings else {}
         context_dict = req.context.model_dump()
+
+        # Look up datasheet specs if manufacturer and model are available
+        datasheet_specs = None
+        manufacturer = req.camera.vendor or req.camera.manufacturer
+        model = req.camera.model
+        if manufacturer and model:
+            try:
+                datasheet_service = get_datasheet_service()
+                datasheet_specs = datasheet_service.get_datasheet(manufacturer, model)
+                if datasheet_specs:
+                    logger.info(f"Found datasheet specs for {manufacturer} {model}")
+            except Exception as e:
+                logger.warning(f"Failed to look up datasheet: {e}")
+
+        # Add datasheet specs to context
+        if datasheet_specs:
+            context_dict["datasheetSpecs"] = datasheet_specs
 
         # Call optimization service
         result = await optimization_service.optimize(

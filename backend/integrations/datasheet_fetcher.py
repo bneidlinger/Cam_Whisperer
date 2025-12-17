@@ -16,49 +16,75 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # User agent for web requests
-USER_AGENT = "PlatoniCam/0.4.0 (Camera Optimization System)"
+USER_AGENT = "PlatoniCam/0.6.0 (Camera Optimization System)"
 
 # Hardcoded manufacturer datasheet URL patterns
+# "patterns" is a list of URL templates to try in order
+# "search_hint" is used for DuckDuckGo fallback search
 MANUFACTURER_URLS = {
     "axis": {
-        "pattern": "https://www.axis.com/products/{model}",
-        "search_hint": "site:axis.com",
+        "patterns": [
+            "https://www.axis.com/dam/public/a1/b2/c3/{model}-datasheet-en-US.pdf",
+        ],
+        "search_hint": "site:axis.com datasheet",
     },
     "bosch": {
-        "pattern": None,  # No direct pattern, use search
-        "search_hint": "site:commerce.boschsecurity.com",
+        "patterns": [],
+        "search_hint": "site:commerce.boschsecurity.com datasheet",
     },
     "hanwha": {
-        "pattern": None,
-        "search_hint": "site:hanwhavision.com",
+        "patterns": [
+            # Hanwha Vision CDN patterns (most common)
+            "https://hanwhavision.eu/wp-content/uploads/products/{model}/DataSheet_{model}_EN.pdf",
+            "https://hanwhavision.eu/wp-content/uploads/products/{model_lower}/DataSheet_{model}_EN.pdf",
+            "https://www.hanwhavision.com/wp-content/uploads/{model}/DataSheet_{model}_EN.pdf",
+            # Hanwha America
+            "https://hanwhavisionamerica.com/wp-content/uploads/2024/01/{model}-Datasheet.pdf",
+            "https://hanwhavisionamerica.com/wp-content/uploads/2023/01/{model}-Datasheet.pdf",
+            # Legacy Samsung/Hanwha CDNs
+            "https://www.hanwhasecurity.com/wp-content/uploads/{model}/{model}_Spec_Sheet.pdf",
+        ],
+        "search_hint": "site:hanwhavision.com OR site:hanwhavision.eu datasheet",
     },
-    "samsung": {  # Hanwha was Samsung
-        "pattern": None,
-        "search_hint": "site:hanwhavision.com",
+    "samsung": {  # Hanwha was Samsung - use same patterns
+        "patterns": [
+            "https://hanwhavision.eu/wp-content/uploads/products/{model}/DataSheet_{model}_EN.pdf",
+        ],
+        "search_hint": "site:hanwhavision.com datasheet",
     },
     "vivotek": {
-        "pattern": None,
-        "search_hint": "site:vivotek.com",
+        "patterns": [
+            "https://www.vivotek.com/website/uploads/ProductDatasheet/{model}.pdf",
+        ],
+        "search_hint": "site:vivotek.com datasheet",
     },
     "uniview": {
-        "pattern": "https://global.uniview.com/Support/Download_Center/Datasheet/Network_Camera/{model}.pdf",
-        "search_hint": "site:uniview.com",
+        "patterns": [
+            "https://global.uniview.com/Support/Download_Center/Datasheet/Network_Camera/{model}.pdf",
+        ],
+        "search_hint": "site:uniview.com datasheet",
     },
     "hikvision": {
-        "pattern": None,
-        "search_hint": "site:hikvision.com",
+        "patterns": [
+            "https://www.hikvision.com/content/dam/hikvision/products/S000000001/S000000010/{model}/Datasheet/{model}_Datasheet.pdf",
+        ],
+        "search_hint": "site:hikvision.com datasheet",
     },
     "dahua": {
-        "pattern": None,
-        "search_hint": "site:dahuasecurity.com",
+        "patterns": [
+            "https://www.dahuasecurity.com/asset/upload/uploads/soft/{model}.pdf",
+        ],
+        "search_hint": "site:dahuasecurity.com datasheet",
     },
     "i-pro": {
-        "pattern": None,
-        "search_hint": "site:i-pro.com",
+        "patterns": [
+            "https://i-pro.com/products_and_solutions/assets/{model}_spec.pdf",
+        ],
+        "search_hint": "site:i-pro.com datasheet",
     },
     "panasonic": {  # i-PRO was Panasonic
-        "pattern": None,
-        "search_hint": "site:i-pro.com",
+        "patterns": [],
+        "search_hint": "site:i-pro.com datasheet",
     },
 }
 
@@ -125,23 +151,42 @@ class DatasheetFetcher:
             return "i-pro"
         return normalized
 
+    def get_hardcoded_urls(
+        self, manufacturer: str, model: str
+    ) -> List[str]:
+        """
+        Get list of hardcoded datasheet URLs to try for known manufacturers.
+        Returns empty list if no patterns exist.
+        """
+        norm_manufacturer = self._normalize_manufacturer(manufacturer)
+        if norm_manufacturer not in MANUFACTURER_URLS:
+            return []
+
+        patterns = MANUFACTURER_URLS[norm_manufacturer].get("patterns", [])
+        if not patterns:
+            return []
+
+        urls = []
+        for pattern in patterns:
+            try:
+                # Replace {model} and {model_lower} placeholders
+                url = pattern.format(model=model, model_lower=model.lower())
+                urls.append(url)
+            except KeyError:
+                # Pattern has placeholder we don't have, skip it
+                pass
+        return urls
+
     def get_hardcoded_url(
         self, manufacturer: str, model: str
     ) -> Optional[str]:
         """
-        Get hardcoded datasheet URL for known manufacturers.
+        Get first hardcoded datasheet URL for known manufacturers.
         Returns None if no pattern exists.
+        (Backwards compatible - use get_hardcoded_urls for all patterns)
         """
-        norm_manufacturer = self._normalize_manufacturer(manufacturer)
-        if norm_manufacturer not in MANUFACTURER_URLS:
-            return None
-
-        pattern = MANUFACTURER_URLS[norm_manufacturer].get("pattern")
-        if not pattern:
-            return None
-
-        # Replace {model} placeholder
-        return pattern.format(model=model)
+        urls = self.get_hardcoded_urls(manufacturer, model)
+        return urls[0] if urls else None
 
     async def search_datasheet_pdf(
         self, manufacturer: str, model: str
@@ -374,6 +419,10 @@ class DatasheetFetcher:
         """
         Fetch and parse datasheet for a camera.
 
+        Tries in order:
+        1. All hardcoded URL patterns for the manufacturer
+        2. DuckDuckGo web search as fallback
+
         Returns:
             Tuple of (pdf_url, parsed_data) where parsed_data contains:
             - raw_text: Full extracted text
@@ -383,22 +432,31 @@ class DatasheetFetcher:
         """
         start_time = datetime.now()
         pdf_url = None
+        pdf_content = None
         parsed_data = {"error": None, "specs": {}, "raw_text": ""}
 
         try:
-            # Try hardcoded URL first
-            pdf_url = self.get_hardcoded_url(manufacturer, model)
-
-            if pdf_url:
-                logger.info(f"Using hardcoded URL: {pdf_url}")
-                pdf_content = await self.download_pdf(pdf_url)
-            else:
-                # Fall back to web search
-                pdf_url = await self.search_datasheet_pdf(manufacturer, model)
-                if pdf_url:
-                    pdf_content = await self.download_pdf(pdf_url)
+            # Try all hardcoded URLs first
+            hardcoded_urls = self.get_hardcoded_urls(manufacturer, model)
+            for url in hardcoded_urls:
+                logger.info(f"Trying hardcoded URL: {url}")
+                content = await self.download_pdf(url)
+                if content:
+                    pdf_url = url
+                    pdf_content = content
+                    logger.info(f"Successfully downloaded from: {url}")
+                    break
                 else:
-                    pdf_content = None
+                    logger.debug(f"URL failed: {url}")
+
+            # Fall back to web search if no hardcoded URLs worked
+            if not pdf_content:
+                logger.info(f"Hardcoded URLs failed, trying web search for {manufacturer} {model}")
+                search_url = await self.search_datasheet_pdf(manufacturer, model)
+                if search_url:
+                    pdf_content = await self.download_pdf(search_url)
+                    if pdf_content:
+                        pdf_url = search_url
 
             if pdf_content:
                 parsed_data = self.parse_pdf(pdf_content)

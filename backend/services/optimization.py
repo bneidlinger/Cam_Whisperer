@@ -276,6 +276,7 @@ class OptimizationService:
             notes=context.get("notes"),
             lighting_condition=context.get("lightingCondition"),
             motion_level=context.get("motionLevel"),
+            datasheet_specs=context.get("datasheetSpecs"),
         )
 
     def _to_response(
