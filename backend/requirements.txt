@@ -9,6 +9,7 @@ pydantic-settings==2.6.1
 
 # ---- AI Integration ----
 anthropic==0.42.0  # Claude Vision API
+google-genai>=1.0.0  # Google Gemini API (unified SDK)
 
 # ---- Database ----
 sqlalchemy==2.0.36

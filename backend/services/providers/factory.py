@@ -9,6 +9,7 @@ from typing import Optional, List, Dict
 
 from .base import OptimizationProvider, ProviderInfo
 from .claude_provider import ClaudeOptimizationProvider
+from .gemini_provider import GeminiOptimizationProvider
 from .heuristic_provider import HeuristicOptimizationProvider
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 class ProviderType(str, Enum):
     """Available provider types"""
     CLAUDE = "claude"
+    GEMINI = "gemini"
     HEURISTIC = "heuristic"
 
 
@@ -29,6 +31,8 @@ def _get_or_create_provider(provider_type: ProviderType) -> OptimizationProvider
     if provider_type not in _providers:
         if provider_type == ProviderType.CLAUDE:
             _providers[provider_type] = ClaudeOptimizationProvider()
+        elif provider_type == ProviderType.GEMINI:
+            _providers[provider_type] = GeminiOptimizationProvider()
         elif provider_type == ProviderType.HEURISTIC:
             _providers[provider_type] = HeuristicOptimizationProvider()
         else:
@@ -54,15 +58,20 @@ def get_provider(
     Raises:
         ValueError: If requested provider unavailable and fallback disabled
     """
-    # If no specific provider requested, try Claude first then heuristic
+    # If no specific provider requested, try Claude first, then Gemini, then heuristic
     if provider_type is None:
         claude = _get_or_create_provider(ProviderType.CLAUDE)
         if claude.is_available():
             logger.debug("Using Claude provider (auto-selected)")
             return claude
 
+        gemini = _get_or_create_provider(ProviderType.GEMINI)
+        if gemini.is_available():
+            logger.debug("Using Gemini provider (auto-selected)")
+            return gemini
+
         if fallback:
-            logger.info("Claude unavailable, falling back to heuristic provider")
+            logger.info("No AI provider available, falling back to heuristic provider")
             return _get_or_create_provider(ProviderType.HEURISTIC)
         else:
             raise ValueError("No AI provider available and fallback disabled")

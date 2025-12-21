@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     claude_max_tokens: int = 4096
     claude_temperature: float = 0.7
 
+    # Google Gemini AI Configuration
+    google_api_key: str = ""  # Empty string if not set - will trigger warning
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_max_tokens: int = 4096
+    gemini_temperature: float = 0.7
+
     # Database
     database_url: str = "sqlite:///./platonicam.db"
 

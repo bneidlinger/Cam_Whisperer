@@ -1465,9 +1465,13 @@
             <span class="nav-label">Bay</span>
             <span class="nav-badge" id="bay-badge">0</span>
           </div>
+          <a href="docs/optimization-providers.html" class="nav-item" style="text-decoration: none; color: inherit;" target="_blank">
+            <span class="nav-icon">?</span>
+            <span class="nav-label">Docs</span>
+          </a>
         </div>
         <div class="sidebar-footer">
-          CLAUDE VISION AI
+          AI VISION
         </div>
       </nav>
 
@@ -1749,6 +1753,22 @@
                           <option value="behavior">Behavior Analysis</option>
                           <option value="counting">People Counting</option>
                           <option value="evidence">Evidence Quality</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- AI Provider Selection -->
+                  <div class="form-section">
+                    <div class="section-header">// AI Provider</div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Optimization Provider</label>
+                        <select id="provider-type">
+                          <option value="">Auto (Best Available)</option>
+                          <option value="claude">Claude AI</option>
+                          <option value="gemini">Google Gemini</option>
+                          <option value="heuristic">Heuristic (Offline)</option>
                         </select>
                       </div>
                     </div>
@@ -3604,8 +3624,13 @@
             profiles: result.profiles
           };
 
-          // Cache credentials if requested
+          // Store credentials on camera object if remember is checked (persists with site data)
           if (remember) {
+            camera.username = username;
+            camera.password = password;
+            sessionCredentials[pendingCameraAdd.ip] = { username, password };
+          } else {
+            // Still cache for current session even if not persisting
             sessionCredentials[pendingCameraAdd.ip] = { username, password };
           }
 
@@ -4044,7 +4069,8 @@
             targetRetentionDays: parseInt(document.getElementById('retention').value),
             notes: `Lighting: ${document.getElementById('lighting').value}, Motion: ${document.getElementById('motion').value}`,
             sampleFrame: state.sampleFrameBase64
-          }
+          },
+          providerType: document.getElementById('provider-type').value || null
         };
 
         const response = await fetch(`${API_BASE}/api/optimize`, {
@@ -6191,9 +6217,20 @@
         return;
       }
 
-      const cameras = getCurrentCameras().filter(cam => cam.username && cam.password);
-      if (cameras.length === 0) {
-        showToast('No cameras with credentials in current site');
+      // Build cameras with credentials - check camera object first, then sessionCredentials fallback
+      const allCameras = getCurrentCameras();
+      const camerasWithCreds = allCameras.map(cam => {
+        // Use stored credentials on camera object, or fall back to session cache
+        const creds = sessionCredentials[cam.ip];
+        return {
+          ...cam,
+          username: cam.username || creds?.username,
+          password: cam.password || creds?.password
+        };
+      }).filter(cam => cam.username && cam.password);
+
+      if (camerasWithCreds.length === 0) {
+        showToast('No cameras with credentials. Re-add cameras with "Remember" checked.');
         return;
       }
 
@@ -6206,7 +6243,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             site_id: site.id,
-            cameras: cameras.map(cam => ({
+            cameras: camerasWithCreds.map(cam => ({
               id: cam.id,
               ip: cam.ip,
               port: cam.port || 80,

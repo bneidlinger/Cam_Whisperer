@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlatoniCam - Optimization Providers Documentation</title>
+  <style>
+    :root {
+      --bg-dark: #0a0a0f;
+      --bg-panel: #12121a;
+      --bg-card: #1a1a24;
+      --border: #2a2a3a;
+      --text: #e0e0e0;
+      --text-dim: #888;
+      --accent: #00d4aa;
+      --accent-dim: #00a080;
+      --claude: #d97706;
+      --gemini: #4285f4;
+      --heuristic: #10b981;
+      --warning: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    header {
+      text-align: center;
+      padding: 3rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+
+    .subtitle {
+      color: var(--text-dim);
+      font-size: 1rem;
+    }
+
+    h2 {
+      color: var(--accent);
+      font-size: 1.5rem;
+      margin: 2rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      color: var(--text);
+      font-size: 1.2rem;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: var(--text-dim);
+    }
+
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .card-header .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .card-header h3 {
+      margin: 0;
+    }
+
+    .card-header .badge {
+      margin-left: auto;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+
+    .claude-card .icon { background: rgba(217, 119, 6, 0.2); }
+    .claude-card .badge { background: var(--claude); color: #000; }
+
+    .gemini-card .icon { background: rgba(66, 133, 244, 0.2); }
+    .gemini-card .badge { background: var(--gemini); color: #fff; }
+
+    .heuristic-card .icon { background: rgba(16, 185, 129, 0.2); }
+    .heuristic-card .badge { background: var(--heuristic); color: #000; }
+
+    /* Diagram Styles */
+    .diagram {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      margin: 2rem 0;
+      overflow-x: auto;
+    }
+
+    .diagram-title {
+      text-align: center;
+      color: var(--accent);
+      margin-bottom: 1.5rem;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .flow-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .flow-box {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1.25rem;
+      text-align: center;
+      min-width: 140px;
+    }
+
+    .flow-box.primary {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .flow-box.claude {
+      border-color: var(--claude);
+      color: var(--claude);
+    }
+
+    .flow-box.gemini {
+      border-color: var(--gemini);
+      color: var(--gemini);
+    }
+
+    .flow-box.heuristic {
+      border-color: var(--heuristic);
+      color: var(--heuristic);
+    }
+
+    .flow-box.decision {
+      transform: rotate(45deg);
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-color: var(--warning);
+    }
+
+    .flow-box.decision span {
+      transform: rotate(-45deg);
+      font-size: 0.8rem;
+      color: var(--warning);
+    }
+
+    .flow-arrow {
+      color: var(--text-dim);
+      font-size: 1.5rem;
+    }
+
+    .flow-arrow.down {
+      transform: rotate(90deg);
+    }
+
+    .flow-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: -0.25rem;
+    }
+
+    /* Architecture Diagram */
+    .arch-diagram {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .arch-layer {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    .arch-layer h4 {
+      color: var(--accent);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.75rem;
+      text-align: center;
+    }
+
+    .arch-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    /* Code blocks */
+    code {
+      background: var(--bg-card);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      color: var(--accent);
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg-card);
+      color: var(--accent);
+      font-weight: normal;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+
+    td {
+      background: var(--bg-panel);
+      color: var(--text-dim);
+    }
+
+    /* Lists */
+    ul, ol {
+      margin: 1rem 0 1rem 1.5rem;
+      color: var(--text-dim);
+    }
+
+    li {
+      margin: 0.5rem 0;
+    }
+
+    /* Comparison Grid */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .comparison-item {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .comparison-item .value {
+      font-size: 1.5rem;
+      color: var(--accent);
+      margin-bottom: 0.25rem;
+    }
+
+    .comparison-item .label {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    /* Scene Rules */
+    .rule-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .rule-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    .rule-card h4 {
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .rule-card ul {
+      margin: 0.5rem 0 0 1rem;
+      font-size: 0.9rem;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: none;
+      margin-bottom: 2rem;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .arch-diagram {
+        grid-template-columns: 1fr;
+      }
+
+      .comparison-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="../index.html" class="back-link">&larr; Back to PlatoniCam</a>
+
+    <header>
+      <h1>Optimization Providers</h1>
+      <p class="subtitle">Technical Documentation for AI and Heuristic Systems</p>
+    </header>
+
+    <!-- Overview Section -->
+    <section>
+      <h2>// System Overview</h2>
+      <p>
+        PlatoniCam uses a modular provider architecture to generate optimal camera settings.
+        The system supports multiple AI providers (Claude, Gemini) and a rule-based heuristic engine,
+        with automatic fallback for reliability.
+      </p>
+
+      <div class="diagram">
+        <div class="diagram-title">Provider Selection Flow</div>
+        <div class="flow-diagram">
+          <div class="flow-box primary">Optimization Request</div>
+          <div class="flow-arrow down">&rarr;</div>
+
+          <div class="flow-box">Provider Factory</div>
+          <div class="flow-arrow down">&rarr;</div>
+
+          <div class="flow-box decision"><span>Auto?</span></div>
+          <div class="flow-arrow down">&rarr;</div>
+
+          <div class="flow-row">
+            <div>
+              <div class="flow-box claude">Claude AI</div>
+              <div class="flow-label">Priority 1</div>
+            </div>
+            <div class="flow-arrow">&rarr;</div>
+            <div>
+              <div class="flow-box gemini">Gemini AI</div>
+              <div class="flow-label">Priority 2</div>
+            </div>
+            <div class="flow-arrow">&rarr;</div>
+            <div>
+              <div class="flow-box heuristic">Heuristic</div>
+              <div class="flow-label">Fallback</div>
+            </div>
+          </div>
+
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box primary">Optimization Result</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section>
+      <h2>// Architecture</h2>
+
+      <div class="diagram">
+        <div class="diagram-title">Provider System Architecture</div>
+        <div class="arch-diagram">
+          <div class="arch-layer">
+            <h4>API Layer</h4>
+            <div class="arch-item">POST /api/optimize</div>
+            <div class="arch-item">providerType param</div>
+          </div>
+          <div class="arch-layer">
+            <h4>Service Layer</h4>
+            <div class="arch-item">OptimizationService</div>
+            <div class="arch-item">ProviderFactory</div>
+            <div class="arch-item">get_provider()</div>
+          </div>
+          <div class="arch-layer">
+            <h4>Provider Layer</h4>
+            <div class="arch-item" style="border-color: var(--claude);">ClaudeProvider</div>
+            <div class="arch-item" style="border-color: var(--gemini);">GeminiProvider</div>
+            <div class="arch-item" style="border-color: var(--heuristic);">HeuristicProvider</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Provider Interface</h3>
+      <p>All providers implement the <code>OptimizationProvider</code> abstract base class:</p>
+
+      <pre><code>class OptimizationProvider(ABC):
+    @property
+    def info(self) -> ProviderInfo:
+        """Provider metadata and capabilities"""
+
+    def is_available(self) -> bool:
+        """Check if provider can accept requests"""
+
+    async def optimize(
+        self,
+        camera: CameraContext,
+        capabilities: CameraCapabilities,
+        current_settings: CameraCurrentSettings,
+        context: OptimizationContext,
+    ) -> OptimizationResult:
+        """Generate optimal settings"""</code></pre>
+    </section>
+
+    <!-- Claude Provider -->
+    <section>
+      <h2>// Claude AI Provider</h2>
+
+      <div class="card claude-card">
+        <div class="card-header">
+          <div class="icon">&#x1F9E0;</div>
+          <div>
+            <h3>Claude Vision AI</h3>
+            <p style="margin: 0; font-size: 0.85rem;">Anthropic Claude Sonnet 4.5</p>
+          </div>
+          <span class="badge">Primary</span>
+        </div>
+
+        <p>
+          Claude analyzes camera context, sample frames, and constraints using advanced vision
+          capabilities. It understands scene composition, lighting conditions, and generates
+          recommendations based on 20+ years of surveillance expertise encoded in its prompt.
+        </p>
+
+        <div class="comparison-grid">
+          <div class="comparison-item">
+            <div class="value">0.8-0.95</div>
+            <div class="label">Confidence Range</div>
+          </div>
+          <div class="comparison-item">
+            <div class="value">~5-15s</div>
+            <div class="label">Response Time</div>
+          </div>
+          <div class="comparison-item">
+            <div class="value">Yes</div>
+            <div class="label">Image Analysis</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li><strong>Scene Analysis</strong> - Analyzes sample frames to understand lighting, contrast, and motion</li>
+        <li><strong>Constraint Solving</strong> - Balances bandwidth limits with quality requirements</li>
+        <li><strong>Sensor Detection</strong> - Identifies ColorVu, Starlight, and other sensor technologies from model names</li>
+        <li><strong>Datasheet Integration</strong> - Uses manufacturer specs when available</li>
+      </ul>
+
+      <h3>How It Works</h3>
+      <div class="diagram">
+        <div class="diagram-title">Claude Optimization Flow</div>
+        <div class="flow-diagram">
+          <div class="flow-row">
+            <div class="flow-box">Camera Context</div>
+            <div class="flow-box">Sample Frame</div>
+            <div class="flow-box">Constraints</div>
+          </div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box claude">Build Expert Prompt (~300 lines)</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box claude">Claude Vision API Call</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box">Parse JSON Response</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box">Validate Against Capabilities</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box primary">OptimizationResult</div>
+        </div>
+      </div>
+
+      <h3>Configuration</h3>
+      <pre><code># backend/.env
+ANTHROPIC_API_KEY=sk-ant-...
+CLAUDE_MODEL=claude-sonnet-4-5-20250929
+CLAUDE_MAX_TOKENS=4096
+CLAUDE_TEMPERATURE=0.7</code></pre>
+    </section>
+
+    <!-- Gemini Provider -->
+    <section>
+      <h2>// Google Gemini Provider</h2>
+
+      <div class="card gemini-card">
+        <div class="card-header">
+          <div class="icon">&#x2728;</div>
+          <div>
+            <h3>Google Gemini Vision AI</h3>
+            <p style="margin: 0; font-size: 0.85rem;">Gemini 2.5 Flash</p>
+          </div>
+          <span class="badge">Alternative</span>
+        </div>
+
+        <p>
+          Gemini provides an alternative AI provider with similar vision capabilities.
+          It uses the same optimization prompt as Claude, ensuring consistent recommendations
+          across providers while offering flexibility for users with different API access.
+        </p>
+
+        <div class="comparison-grid">
+          <div class="comparison-item">
+            <div class="value">0.8-0.95</div>
+            <div class="label">Confidence Range</div>
+          </div>
+          <div class="comparison-item">
+            <div class="value">~3-10s</div>
+            <div class="label">Response Time</div>
+          </div>
+          <div class="comparison-item">
+            <div class="value">Yes</div>
+            <div class="label">Image Analysis</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Key Differences from Claude</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th>Claude</th>
+            <th>Gemini</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Image Format</td>
+            <td>Base64 string</td>
+            <td>Raw bytes</td>
+          </tr>
+          <tr>
+            <td>API Style</td>
+            <td>Messages API</td>
+            <td>Generate Content</td>
+          </tr>
+          <tr>
+            <td>SDK</td>
+            <td>anthropic</td>
+            <td>google-genai</td>
+          </tr>
+          <tr>
+            <td>Response Speed</td>
+            <td>Moderate</td>
+            <td>Fast (Flash model)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Configuration</h3>
+      <pre><code># backend/.env
+GOOGLE_API_KEY=AIza...
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MAX_TOKENS=4096
+GEMINI_TEMPERATURE=0.7</code></pre>
+    </section>
+
+    <!-- Heuristic Provider -->
+    <section>
+      <h2>// Heuristic Provider</h2>
+
+      <div class="card heuristic-card">
+        <div class="card-header">
+          <div class="icon">&#x2699;</div>
+          <div>
+            <h3>Rule-Based Engine</h3>
+            <p style="margin: 0; font-size: 0.85rem;">Industry Best Practices</p>
+          </div>
+          <span class="badge">Offline</span>
+        </div>
+
+        <p>
+          The heuristic provider uses a deterministic rule-based engine that applies industry
+          best practices for camera configuration. It requires no API keys and works offline,
+          serving as both a standalone option and automatic fallback when AI providers are unavailable.
+        </p>
+
+        <div class="comparison-grid">
+          <div class="comparison-item">
+            <div class="value">0.6</div>
+            <div class="label">Base Confidence</div>
+          </div>
+          <div class="comparison-item">
+            <div class="value">&lt;100ms</div>
+            <div class="label">Response Time</div>
+          </div>
+          <div class="comparison-item">
+            <div class="value">No</div>
+            <div class="label">Image Analysis</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Rule Application Order</h3>
+      <div class="diagram">
+        <div class="diagram-title">Heuristic Processing Pipeline</div>
+        <div class="flow-diagram">
+          <div class="flow-box">Current Settings / Defaults</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box heuristic">Apply Scene Type Rules</div>
+          <div class="flow-label">Environmental adjustments</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box heuristic">Apply Purpose Rules</div>
+          <div class="flow-label">Mission-critical overrides</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box heuristic">Apply Bandwidth Constraints</div>
+          <div class="flow-label">Reduce FPS/resolution if needed</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box heuristic">Clamp to Capabilities</div>
+          <div class="flow-label">Ensure hardware limits respected</div>
+          <div class="flow-arrow down">&rarr;</div>
+          <div class="flow-box primary">OptimizationResult</div>
+        </div>
+      </div>
+
+      <h3>Scene Type Rules</h3>
+      <div class="rule-grid">
+        <div class="rule-card">
+          <h4>&#x1F6AA; Entrance</h4>
+          <ul>
+            <li>WDR: High</li>
+            <li>Handles glass/bright backgrounds</li>
+            <li>Faster shutter for faces</li>
+          </ul>
+        </div>
+        <div class="rule-card">
+          <h4>&#x1F697; Parking</h4>
+          <ul>
+            <li>WDR: Medium</li>
+            <li>HLC: On (headlights)</li>
+            <li>IR Mode: Auto</li>
+          </ul>
+        </div>
+        <div class="rule-card">
+          <h4>&#x1F6B6; Hallway</h4>
+          <ul>
+            <li>Balance motion/low-light</li>
+            <li>Moderate DNR</li>
+            <li>Standard shutter</li>
+          </ul>
+        </div>
+        <div class="rule-card">
+          <h4>&#x1F3E2; Perimeter</h4>
+          <ul>
+            <li>Detection over ID</li>
+            <li>Wider FOV settings</li>
+            <li>Higher sensitivity</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Purpose Rules (Override Scene)</h3>
+      <div class="rule-grid">
+        <div class="rule-card">
+          <h4>&#x1F464; Facial Recognition</h4>
+          <ul>
+            <li>Shutter: 1/250 minimum</li>
+            <li>FPS: 20+</li>
+            <li>Mode: Shutter Priority</li>
+            <li>DNR: Light (preserve detail)</li>
+          </ul>
+        </div>
+        <div class="rule-card">
+          <h4>&#x1F698; License Plates (LPR)</h4>
+          <ul>
+            <li>Shutter: 1/500+ (non-negotiable)</li>
+            <li>WDR: Off (prevents ghosting)</li>
+            <li>HLC: On (headlight glare)</li>
+            <li>Accept higher noise</li>
+          </ul>
+        </div>
+        <div class="rule-card">
+          <h4>&#x1F4F9; Evidence Quality</h4>
+          <ul>
+            <li>High bitrate</li>
+            <li>CBR mode</li>
+            <li>Quality over bandwidth</li>
+          </ul>
+        </div>
+        <div class="rule-card">
+          <h4>&#x1F6A8; Intrusion Detection</h4>
+          <ul>
+            <li>Higher FPS</li>
+            <li>Detection over ID</li>
+            <li>Fast response priority</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>LPR Constraints (Highest Priority)</h3>
+      <p>
+        License Plate Recognition has the strictest requirements. These settings are
+        <strong>non-negotiable</strong> and override all other rules:
+      </p>
+      <pre><code>PURPOSE_RULES["plates"] = {
+    "min_fps": 25,
+    "exposure_mode": "Shutter Priority",
+    "shutter": "1/500",        # Freeze motion - absolute priority
+    "slow_shutter": "Off",
+    "wdr": "Off",              # Prevents ghosting artifacts
+    "hlc": "On",               # Mask headlight glare
+    "gain_limit": 36,          # Accept noise over blur
+    "dnr": "Medium",
+}</code></pre>
+    </section>
+
+    <!-- Comparison Section -->
+    <section>
+      <h2>// Provider Comparison</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th style="color: var(--claude);">Claude</th>
+            <th style="color: var(--gemini);">Gemini</th>
+            <th style="color: var(--heuristic);">Heuristic</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>API Key Required</td>
+            <td>Yes (Anthropic)</td>
+            <td>Yes (Google)</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Works Offline</td>
+            <td>No</td>
+            <td>No</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>Image Analysis</td>
+            <td>Yes (Vision)</td>
+            <td>Yes (Vision)</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Response Time</td>
+            <td>5-15 seconds</td>
+            <td>3-10 seconds</td>
+            <td>&lt;100ms</td>
+          </tr>
+          <tr>
+            <td>Base Confidence</td>
+            <td>0.80</td>
+            <td>0.80</td>
+            <td>0.60</td>
+          </tr>
+          <tr>
+            <td>Scene Understanding</td>
+            <td>Deep (AI)</td>
+            <td>Deep (AI)</td>
+            <td>Rule-based</td>
+          </tr>
+          <tr>
+            <td>Datasheet Awareness</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>Limited</td>
+          </tr>
+          <tr>
+            <td>Cost</td>
+            <td>Per API call</td>
+            <td>Per API call</td>
+            <td>Free</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Fallback System -->
+    <section>
+      <h2>// Fallback System</h2>
+
+      <p>
+        The system automatically falls back to ensure optimization always succeeds:
+      </p>
+
+      <div class="diagram">
+        <div class="diagram-title">Automatic Fallback Chain</div>
+        <div class="flow-diagram">
+          <div class="flow-box claude">Try Claude</div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-box decision"><span>OK?</span></div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-row">
+            <div>
+              <div class="flow-label">Yes</div>
+              <div class="flow-arrow down">&rarr;</div>
+              <div class="flow-box primary">Return Result</div>
+            </div>
+            <div style="width: 50px;"></div>
+            <div>
+              <div class="flow-label">No (rate limit, auth error, timeout)</div>
+              <div class="flow-arrow down">&rarr;</div>
+              <div class="flow-box gemini">Try Gemini</div>
+              <div class="flow-arrow down">&rarr;</div>
+              <div class="flow-box decision"><span>OK?</span></div>
+              <div class="flow-arrow down">&rarr;</div>
+              <div class="flow-box heuristic">Heuristic (Always Available)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Error Handling</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Error Type</th>
+            <th>Behavior</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ProviderRateLimitError</code></td>
+            <td>Fallback to next provider</td>
+          </tr>
+          <tr>
+            <td><code>ProviderAuthError</code></td>
+            <td>Fallback to next provider</td>
+          </tr>
+          <tr>
+            <td><code>InvalidResponseError</code></td>
+            <td>Fallback to next provider</td>
+          </tr>
+          <tr>
+            <td><code>ProviderError</code></td>
+            <td>Fallback to next provider</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Configuration</h3>
+      <pre><code># backend/.env
+FALLBACK_TO_HEURISTIC=true  # Enable automatic fallback</code></pre>
+    </section>
+
+    <!-- Confidence Scoring -->
+    <section>
+      <h2>// Confidence Scoring</h2>
+
+      <p>
+        Each optimization result includes a confidence score (0.0 - 1.0) indicating
+        the reliability of the recommendations:
+      </p>
+
+      <h3>AI Provider Scoring</h3>
+      <pre><code>Base confidence: 0.80
+
+Adjustments:
+  + 0.10  if bandwidth constraint met
+  - 0.20  if bitrate exceeds limit
+  + 0.05  if FPS within capability
+  - 0.15  if FPS exceeds capability
+  - 0.05  per warning generated
+
+Final: clamp(0.0, 1.0)</code></pre>
+
+      <h3>Heuristic Provider Scoring</h3>
+      <pre><code>Base confidence: 0.60
+
+Adjustments:
+  + 0.05  if sample frame provided (not used, but noted)
+  + 0.05  if all constraints satisfied
+  - 0.10  if bandwidth exceeded
+  - 0.05  per capability violation
+
+Final: clamp(0.0, 1.0)</code></pre>
+    </section>
+
+    <!-- API Usage -->
+    <section>
+      <h2>// API Usage</h2>
+
+      <h3>Request</h3>
+      <pre><code>POST /api/optimize
+Content-Type: application/json
+
+{
+  "camera": {
+    "id": "cam-001",
+    "sceneType": "parking",
+    "purpose": "plates",
+    "vendor": "Hikvision",
+    "model": "DS-2CD2347G2-LU"
+  },
+  "capabilities": {
+    "maxResolution": "3840x2160",
+    "supportedCodecs": ["H.264", "H.265"],
+    "maxFps": 30
+  },
+  "context": {
+    "bandwidthLimitMbps": 8,
+    "targetRetentionDays": 30,
+    "sampleFrame": "data:image/jpeg;base64,..."
+  },
+  "providerType": "gemini"  // "claude", "gemini", "heuristic", or null for auto
+}</code></pre>
+
+      <h3>Response</h3>
+      <pre><code>{
+  "recommendedSettings": {
+    "stream": { "resolution": "1920x1080", "codec": "H.265", "fps": 25 },
+    "exposure": { "shutter": "1/500", "wdr": "Off", "hlc": "On" },
+    "lowLight": { "irMode": "Auto", "dnr": "Medium" }
+  },
+  "confidence": 0.85,
+  "explanation": "Settings optimized for LPR with fast shutter...",
+  "warnings": ["WDR disabled per LPR requirements"],
+  "aiProvider": "gemini-2.5-flash",
+  "processingTime": 4.23
+}</code></pre>
+    </section>
+
+    <footer style="text-align: center; padding: 3rem 0; border-top: 1px solid var(--border); margin-top: 3rem;">
+      <p style="color: var(--text-dim);">
+        PlatoniCam Optimization Providers &bull;
+        <a href="../index.html" style="color: var(--accent);">Back to App</a>
+      </p>
+    </footer>
+  </div>
+</body>
+</html>

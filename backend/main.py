@@ -101,7 +101,9 @@ async def startup_event():
     logger.info("=" * 60)
     logger.info(f"Environment: {settings.app_env}")
     logger.info(f"Claude Model: {settings.claude_model}")
-    logger.info(f"API Key configured: {'Yes' if settings.anthropic_api_key else 'No'}")
+    logger.info(f"Gemini Model: {settings.gemini_model}")
+    logger.info(f"Claude API Key: {'Yes' if settings.anthropic_api_key else 'No'}")
+    logger.info(f"Gemini API Key: {'Yes' if settings.google_api_key else 'No'}")
     logger.info(f"Fallback to heuristic: {settings.fallback_to_heuristic}")
 
     # Initialize database
@@ -113,9 +115,9 @@ async def startup_event():
 
     logger.info("=" * 60)
 
-    if not settings.anthropic_api_key:
-        logger.warning("No Anthropic API key configured! Will use heuristic fallback only.")
-        logger.warning("Set ANTHROPIC_API_KEY in .env file to enable Claude Vision.")
+    if not settings.anthropic_api_key and not settings.google_api_key:
+        logger.warning("No AI API keys configured! Will use heuristic fallback only.")
+        logger.warning("Set ANTHROPIC_API_KEY or GOOGLE_API_KEY in .env file to enable AI optimization.")
 
     # Initialize emergency record service and restore sessions
     if settings.emergency_record_enabled:
@@ -286,6 +288,7 @@ class OptimizeRequest(BaseModel):
     capabilities: CameraCapabilities
     currentSettings: Optional[CameraCurrentSettings] = None
     context: OptimizeContext
+    providerType: Optional[str] = None  # "claude", "gemini", or "heuristic"
 
 class OptimizeResponse(BaseModel):
     recommendedSettings: CameraCurrentSettings
@@ -849,7 +852,8 @@ async def optimize_camera(req: OptimizeRequest):
             camera=camera_dict,
             capabilities=capabilities_dict,
             current_settings=current_settings_dict,
-            context=context_dict
+            context=context_dict,
+            provider_type=req.providerType
         )
 
         # Convert result back to response model
