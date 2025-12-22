@@ -377,6 +377,79 @@ class VmsAuthError(AuthenticationError):
 
 
 # =============================================================================
+# CLOUD VMS SPECIFIC ERRORS
+# =============================================================================
+
+class VerkadaConnectionError(VmsConnectionError):
+    """Failed to connect to Verkada API"""
+
+    def __init__(self, message: str = "Failed to connect to Verkada API", details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            vms_type="verkada",
+            message=message,
+            details=details
+        )
+        self.recovery_hint = "Verify Verkada API key and check network connectivity to api.verkada.com"
+
+
+class VerkadaAuthError(VmsAuthError):
+    """Verkada authentication failed"""
+
+    def __init__(self, message: str = "Invalid API key"):
+        super().__init__(vms_type="verkada")
+        self.message = f"Verkada authentication failed: {message}"
+        self.recovery_hint = "Verify API key from Verkada Command dashboard. Keys are per-organization."
+        self.details = {
+            "vmsType": "verkada",
+            "apiDocs": "https://apidocs.verkada.com/reference/introduction",
+            "keyLocation": "Command Dashboard > Admin > API Keys"
+        }
+
+
+class RhombusConnectionError(VmsConnectionError):
+    """Failed to connect to Rhombus API"""
+
+    def __init__(self, message: str = "Failed to connect to Rhombus API", details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            vms_type="rhombus",
+            message=message,
+            details=details
+        )
+        self.recovery_hint = "Verify Rhombus API key and check network connectivity to api2.rhombussystems.com"
+
+
+class RhombusAuthError(VmsAuthError):
+    """Rhombus authentication failed"""
+
+    def __init__(self, message: str = "Invalid API key"):
+        super().__init__(vms_type="rhombus")
+        self.message = f"Rhombus authentication failed: {message}"
+        self.recovery_hint = "Verify API key from Rhombus Console."
+        self.details = {
+            "vmsType": "rhombus",
+            "apiDocs": "https://api-docs.rhombus.community/",
+            "keyLocation": "Rhombus Console > Settings > API Keys"
+        }
+
+
+class GenetecNotAvailableError(VmsConnectionError):
+    """Genetec integration not available"""
+
+    def __init__(self):
+        super().__init__(
+            vms_type="genetec",
+            message="Genetec integration requires DAP membership"
+        )
+        self.recovery_hint = "Join Genetec DAP at https://www.genetec.com/partners/sdk-dap"
+        self.details = {
+            "vmsType": "genetec",
+            "dapUrl": "https://www.genetec.com/partners/sdk-dap",
+            "developerPortal": "https://developer.genetec.com/",
+            "status": "placeholder"
+        }
+
+
+# =============================================================================
 # TIMEOUT ERRORS
 # =============================================================================
 

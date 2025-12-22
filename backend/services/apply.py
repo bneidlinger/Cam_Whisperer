@@ -15,6 +15,9 @@ from enum import Enum
 
 from integrations.onvif_client import ONVIFClient
 from integrations.hanwha_wave_client import HanwhaWAVEClient
+from integrations.verkada_client import VerkadaClient
+from integrations.rhombus_client import RhombusClient
+from integrations.genetec_client import GenetecNotImplementedError
 from database import get_db_session
 from models.orm import AppliedConfig
 
@@ -606,15 +609,35 @@ class ApplyService:
                 password=password,
                 verify=verify
             )
+        elif vms_system.lower() == "verkada":
+            return await self._apply_settings_verkada(
+                camera_id=camera_id,
+                vms_camera_id=vms_camera_id,
+                settings=settings,
+                api_key=password,  # API key passed via password field
+                org_id=username if username else None,  # Org ID via username
+                region=server_ip if server_ip in ("us", "eu") else "us",
+                verify=verify
+            )
+        elif vms_system.lower() == "rhombus":
+            return await self._apply_settings_rhombus(
+                camera_id=camera_id,
+                vms_camera_id=vms_camera_id,
+                settings=settings,
+                api_key=password,  # API key passed via password field
+                verify=verify
+            )
         elif vms_system.lower() == "genetec":
-            # Future: Genetec integration
+            # Genetec requires DAP membership
             return {
                 "job_id": f"vms-{camera_id}",
                 "status": ApplyStatus.FAILED,
                 "error": {
                     "code": "NOT_IMPLEMENTED",
-                    "message": "Genetec VMS integration not yet implemented"
-                }
+                    "message": "Genetec VMS integration requires DAP membership. See https://www.genetec.com/partners/sdk-dap"
+                },
+                "setupUrl": "https://www.genetec.com/partners/sdk-dap",
+                "developerPortal": "https://developer.genetec.com/"
             }
         elif vms_system.lower() == "milestone":
             # Future: Milestone integration
@@ -632,7 +655,7 @@ class ApplyService:
                 "status": ApplyStatus.FAILED,
                 "error": {
                     "code": "UNSUPPORTED_VMS",
-                    "message": f"VMS platform '{vms_system}' is not supported"
+                    "message": f"VMS platform '{vms_system}' is not supported. Supported: hanwha-wave, verkada, rhombus"
                 }
             }
 
@@ -868,6 +891,239 @@ class ApplyService:
         except Exception as e:
             logger.error(f"Settings verification failed: {e}")
             return False
+
+
+    async def _apply_settings_verkada(
+        self,
+        camera_id: str,
+        vms_camera_id: str,
+        settings: Dict,
+        api_key: str,
+        org_id: Optional[str] = None,
+        region: str = "us",
+        verify: bool = True,
+        optimization_id: Optional[int] = None,
+    ) -> Dict:
+        """
+        Apply settings via Verkada Cloud VMS
+
+        Note: Verkada cameras are cloud-managed. Most settings are configured
+        through the Command dashboard. This method returns information about
+        what can/cannot be applied via API.
+
+        Args:
+            camera_id: PlatoniCam camera ID
+            vms_camera_id: Camera ID in Verkada
+            settings: Settings to apply
+            api_key: Verkada API key
+            org_id: Organization ID (optional)
+            region: API region
+            verify: Whether to verify after apply
+            optimization_id: Optional optimization ID
+
+        Returns:
+            Apply result
+        """
+        logger.info(f"Applying settings via Verkada for camera {camera_id}")
+
+        # Verkada is cloud-managed - settings are primarily controlled via Command dashboard
+        # The API is read-heavy with limited write capabilities
+
+        return {
+            "id": None,
+            "job_id": f"verkada-{camera_id}",
+            "camera_id": camera_id,
+            "vms_camera_id": vms_camera_id,
+            "status": ApplyStatus.PARTIAL,
+            "message": "Verkada cameras are cloud-managed. Settings should be applied via Verkada Command dashboard.",
+            "vms_system": "verkada",
+            "cloudManaged": True,
+            "recommendations": {
+                "action": "Apply settings in Verkada Command",
+                "url": "https://command.verkada.com",
+                "settings": settings
+            },
+            "note": (
+                "Verkada API is primarily read-only for camera settings. "
+                "Please apply the recommended settings through the Verkada Command dashboard: "
+                "https://command.verkada.com"
+            )
+        }
+
+
+    async def _apply_settings_rhombus(
+        self,
+        camera_id: str,
+        vms_camera_id: str,
+        settings: Dict,
+        api_key: str,
+        verify: bool = True,
+        optimization_id: Optional[int] = None,
+    ) -> Dict:
+        """
+        Apply settings via Rhombus Cloud VMS
+
+        Args:
+            camera_id: PlatoniCam camera ID
+            vms_camera_id: Camera UUID in Rhombus
+            settings: Settings to apply
+            api_key: Rhombus API key
+            verify: Whether to verify after apply
+            optimization_id: Optional optimization ID
+
+        Returns:
+            Apply result
+        """
+        # Create job in database
+        job_id = self._create_job(
+            camera_id=camera_id,
+            settings=settings,
+            apply_method="rhombus",
+            optimization_id=optimization_id,
+        )
+
+        logger.info(f"Starting Rhombus settings apply job {job_id} for camera {camera_id}")
+
+        # Update status to applying
+        self._update_job_status(job_id, "applying")
+
+        # Create in-memory job tracking
+        job = {
+            "id": job_id,
+            "job_id": job_id,
+            "camera_id": camera_id,
+            "vms_camera_id": vms_camera_id,
+            "status": ApplyStatus.IN_PROGRESS,
+            "progress": 0,
+            "steps": [],
+            "started_at": datetime.utcnow().isoformat() + "Z",
+            "completed_at": None,
+            "error": None,
+            "vms_system": "rhombus"
+        }
+
+        self._job_cache[job_id] = job
+
+        try:
+            # Step 1: Connect to Rhombus
+            job["steps"].append({"name": "Connect to Rhombus API", "status": "in_progress"})
+            job["progress"] = 10
+
+            rhombus_client = RhombusClient(api_key=api_key)
+
+            # Test connection
+            connected = await rhombus_client.test_connection()
+            if not connected:
+                raise Exception("Cannot connect to Rhombus API")
+
+            job["steps"][-1]["status"] = "completed"
+            job["progress"] = 20
+
+            # Step 2: Get current settings (for backup/verification)
+            if verify:
+                job["steps"].append({"name": "Query current settings", "status": "in_progress"})
+                job["progress"] = 30
+
+                current_settings = await rhombus_client.get_camera_settings(vms_camera_id)
+                job["current_settings"] = current_settings
+
+                job["steps"][-1]["status"] = "completed"
+                job["progress"] = 40
+
+            # Step 3: Apply settings
+            job["steps"].append({"name": "Apply settings to camera", "status": "in_progress"})
+            job["progress"] = 50
+
+            success = await rhombus_client.update_camera_config(vms_camera_id, settings)
+
+            if not success:
+                raise Exception("Failed to apply settings via Rhombus API")
+
+            job["steps"][-1]["status"] = "completed"
+            job["progress"] = 70
+
+            # Step 4: Verify settings (if requested)
+            if verify:
+                job["steps"].append({"name": "Verify applied settings", "status": "in_progress"})
+                job["progress"] = 80
+
+                # Wait a moment for settings to take effect
+                await asyncio.sleep(2)
+
+                # Get updated settings
+                new_settings = await rhombus_client.get_camera_settings(vms_camera_id)
+
+                # Compare key settings (basic verification)
+                verification_passed = True
+                if settings.get("stream", {}).get("resolution"):
+                    if settings["stream"]["resolution"] != new_settings.get("stream", {}).get("resolution"):
+                        verification_passed = False
+
+                if not verification_passed:
+                    job["steps"][-1]["status"] = "warning"
+                    job["warnings"] = ["Some settings may not have been applied correctly"]
+                else:
+                    job["steps"][-1]["status"] = "completed"
+
+                job["progress"] = 90
+
+            # Complete job
+            rhombus_client.close()
+
+            job["status"] = ApplyStatus.COMPLETED
+            job["progress"] = 100
+            job["completed_at"] = datetime.utcnow().isoformat() + "Z"
+            job["steps"].append({"name": "Apply complete", "status": "completed"})
+
+            # Update database
+            self._update_job_status(job_id, "success")
+
+            # Clean up cache
+            if job_id in self._job_cache:
+                del self._job_cache[job_id]
+
+            logger.info(f"Rhombus apply job {job_id} completed successfully")
+
+            return {
+                "id": job_id,
+                "job_id": job_id,
+                "status": ApplyStatus.COMPLETED,
+                "message": "Settings applied successfully via Rhombus",
+                "camera_id": camera_id,
+                "vms_camera_id": vms_camera_id,
+                "vms_system": "rhombus"
+            }
+
+        except Exception as e:
+            logger.error(f"Rhombus apply job {job_id} failed: {e}")
+
+            job["status"] = ApplyStatus.FAILED
+            job["error"] = {
+                "code": "RHOMBUS_APPLY_FAILED",
+                "message": str(e)
+            }
+            job["completed_at"] = datetime.utcnow().isoformat() + "Z"
+
+            if job["steps"] and job["steps"][-1]["status"] == "in_progress":
+                job["steps"][-1]["status"] = "failed"
+
+            # Update database
+            self._update_job_status(job_id, "failed", error_message=str(e))
+
+            # Clean up cache
+            if job_id in self._job_cache:
+                del self._job_cache[job_id]
+
+            return {
+                "id": job_id,
+                "job_id": job_id,
+                "status": ApplyStatus.FAILED,
+                "error": {
+                    "code": "RHOMBUS_APPLY_FAILED",
+                    "message": str(e)
+                },
+                "vms_system": "rhombus"
+            }
 
 
     async def rollback_settings(

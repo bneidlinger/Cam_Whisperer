@@ -54,7 +54,9 @@ class ApplyMethod(str, Enum):
     """Method used to apply settings to camera"""
     ONVIF = "onvif"             # Direct ONVIF protocol
     WAVE = "wave"               # Hanwha WAVE VMS API
-    GENETEC = "genetec"         # Genetec Security Center
+    VERKADA = "verkada"         # Verkada Cloud VMS API
+    RHOMBUS = "rhombus"         # Rhombus Cloud VMS API
+    GENETEC = "genetec"         # Genetec Security Center (placeholder)
     MILESTONE = "milestone"     # Milestone XProtect
     MANUAL = "manual"           # Generate config file only (no auto-apply)
 

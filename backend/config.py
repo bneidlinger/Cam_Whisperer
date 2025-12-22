@@ -46,6 +46,17 @@ class Settings(BaseSettings):
     onvif_timeout_seconds: int = 10
     camera_snapshot_timeout_seconds: int = 15
 
+    # SaaS VMS Integration Settings
+    # Verkada Cloud VMS
+    verkada_api_timeout_seconds: int = 30
+    verkada_token_refresh_margin_seconds: int = 300  # Refresh token 5 min before expiry
+
+    # Rhombus Cloud VMS
+    rhombus_api_timeout_seconds: int = 30
+
+    # Genetec (requires DAP membership for full implementation)
+    genetec_web_sdk_timeout_seconds: int = 30
+
     # AI Optimization Settings
     ai_optimization_timeout_seconds: int = 30
     fallback_to_heuristic: bool = True

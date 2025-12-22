@@ -1184,6 +1184,371 @@ async def get_wave_current_settings(
         raise
 
 
+# ---- Verkada Cloud VMS endpoints ----
+
+@app.get("/api/verkada/discover")
+async def discover_verkada_cameras(
+    request: Request,
+    api_key: str,
+    org_id: Optional[str] = None,
+    region: str = "us"
+):
+    """
+    Discover cameras via Verkada Command API
+
+    Rate limited to prevent abuse (max 3 requests/minute per client).
+
+    Args:
+        api_key: Verkada API key from Command dashboard
+        org_id: Organization ID (optional, for multi-org accounts)
+        region: API region ("us" or "eu")
+
+    Returns:
+        List of cameras in Verkada organization
+    """
+    # Get client identifier for rate limiting
+    client_id = request.client.host if request.client else "unknown"
+
+    # Check rate limit
+    rate_limiter = get_discovery_rate_limiter()
+    rate_limiter.check_rate_limit(client_id)
+
+    logger.info(f"Verkada camera discovery requested from {client_id} (region: {region})")
+
+    try:
+        discovery_service = DiscoveryService()
+        cameras = await discovery_service.discover_verkada_cameras(
+            api_key=api_key,
+            org_id=org_id,
+            region=region
+        )
+
+        # Get rate limit status for response
+        rate_status = rate_limiter.get_status(client_id)
+
+        logger.info(f"Verkada discovery complete: found {len(cameras)} cameras")
+
+        return {
+            "cameras": cameras,
+            "foundCameras": len(cameras),
+            "vmsSystem": "verkada",
+            "region": region,
+            "cloudManaged": True,
+            "rateLimit": {
+                "remaining": rate_status["requests_remaining"],
+                "resetSeconds": rate_status["reset_seconds"],
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Verkada discovery failed: {e}", exc_info=True)
+        return {
+            "cameras": [],
+            "error": str(e),
+            "foundCameras": 0,
+            "vmsSystem": "verkada"
+        }
+
+
+@app.get("/api/verkada/cameras/{camera_id}/capabilities")
+async def get_verkada_camera_capabilities(
+    camera_id: str,
+    api_key: str,
+    org_id: Optional[str] = None,
+    region: str = "us"
+):
+    """
+    Query camera capabilities via Verkada API
+
+    Args:
+        camera_id: Verkada camera ID
+        api_key: Verkada API key
+        org_id: Organization ID (optional)
+        region: API region
+
+    Returns:
+        Camera capabilities
+    """
+    logger.info(f"Verkada capabilities query for camera {camera_id}")
+
+    try:
+        discovery_service = DiscoveryService()
+        capabilities = await discovery_service.get_verkada_camera_capabilities(
+            api_key=api_key,
+            camera_id=camera_id,
+            org_id=org_id,
+            region=region
+        )
+
+        return {
+            "cameraId": camera_id,
+            "capabilities": capabilities,
+            "vmsSystem": "verkada",
+            "cloudManaged": True
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to query Verkada camera capabilities: {e}", exc_info=True)
+        raise
+
+
+@app.get("/api/verkada/cameras/{camera_id}/current-settings")
+async def get_verkada_current_settings(
+    camera_id: str,
+    api_key: str,
+    org_id: Optional[str] = None,
+    region: str = "us"
+):
+    """
+    Query current camera settings via Verkada API
+
+    Args:
+        camera_id: Verkada camera ID
+        api_key: Verkada API key
+        org_id: Organization ID (optional)
+        region: API region
+
+    Returns:
+        Current camera configuration
+    """
+    logger.info(f"Verkada current settings query for camera {camera_id}")
+
+    try:
+        discovery_service = DiscoveryService()
+        current_settings = await discovery_service.get_verkada_current_settings(
+            api_key=api_key,
+            camera_id=camera_id,
+            org_id=org_id,
+            region=region
+        )
+
+        return {
+            "cameraId": camera_id,
+            "currentSettings": current_settings,
+            "vmsSystem": "verkada",
+            "cloudManaged": True,
+            "note": "Verkada cameras are cloud-managed. Settings are configured via Command dashboard."
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to query Verkada current settings: {e}", exc_info=True)
+        raise
+
+
+# ---- Rhombus Cloud VMS endpoints ----
+
+@app.get("/api/rhombus/discover")
+async def discover_rhombus_cameras(
+    request: Request,
+    api_key: str
+):
+    """
+    Discover cameras via Rhombus API
+
+    Rate limited to prevent abuse (max 3 requests/minute per client).
+
+    Args:
+        api_key: Rhombus API key from Console
+
+    Returns:
+        List of cameras in Rhombus organization
+    """
+    # Get client identifier for rate limiting
+    client_id = request.client.host if request.client else "unknown"
+
+    # Check rate limit
+    rate_limiter = get_discovery_rate_limiter()
+    rate_limiter.check_rate_limit(client_id)
+
+    logger.info(f"Rhombus camera discovery requested from {client_id}")
+
+    try:
+        discovery_service = DiscoveryService()
+        cameras = await discovery_service.discover_rhombus_cameras(
+            api_key=api_key
+        )
+
+        # Get rate limit status for response
+        rate_status = rate_limiter.get_status(client_id)
+
+        logger.info(f"Rhombus discovery complete: found {len(cameras)} cameras")
+
+        return {
+            "cameras": cameras,
+            "foundCameras": len(cameras),
+            "vmsSystem": "rhombus",
+            "cloudManaged": True,
+            "rateLimit": {
+                "remaining": rate_status["requests_remaining"],
+                "resetSeconds": rate_status["reset_seconds"],
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Rhombus discovery failed: {e}", exc_info=True)
+        return {
+            "cameras": [],
+            "error": str(e),
+            "foundCameras": 0,
+            "vmsSystem": "rhombus"
+        }
+
+
+@app.get("/api/rhombus/cameras/{camera_id}/capabilities")
+async def get_rhombus_camera_capabilities(
+    camera_id: str,
+    api_key: str
+):
+    """
+    Query camera capabilities via Rhombus API
+
+    Args:
+        camera_id: Rhombus camera UUID
+        api_key: Rhombus API key
+
+    Returns:
+        Camera capabilities
+    """
+    logger.info(f"Rhombus capabilities query for camera {camera_id}")
+
+    try:
+        discovery_service = DiscoveryService()
+        capabilities = await discovery_service.get_rhombus_camera_capabilities(
+            api_key=api_key,
+            camera_id=camera_id
+        )
+
+        return {
+            "cameraId": camera_id,
+            "capabilities": capabilities,
+            "vmsSystem": "rhombus",
+            "cloudManaged": True
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to query Rhombus camera capabilities: {e}", exc_info=True)
+        raise
+
+
+@app.get("/api/rhombus/cameras/{camera_id}/current-settings")
+async def get_rhombus_current_settings(
+    camera_id: str,
+    api_key: str
+):
+    """
+    Query current camera settings via Rhombus API
+
+    Args:
+        camera_id: Rhombus camera UUID
+        api_key: Rhombus API key
+
+    Returns:
+        Current camera configuration
+    """
+    logger.info(f"Rhombus current settings query for camera {camera_id}")
+
+    try:
+        discovery_service = DiscoveryService()
+        current_settings = await discovery_service.get_rhombus_current_settings(
+            api_key=api_key,
+            camera_id=camera_id
+        )
+
+        return {
+            "cameraId": camera_id,
+            "currentSettings": current_settings,
+            "vmsSystem": "rhombus",
+            "cloudManaged": True
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to query Rhombus current settings: {e}", exc_info=True)
+        raise
+
+
+# ---- Genetec Stratocast (placeholder) ----
+
+@app.get("/api/genetec/discover")
+async def discover_genetec_cameras(
+    request: Request,
+    base_url: str = "",
+    username: str = "",
+    password: str = ""
+):
+    """
+    Discover cameras via Genetec Security Center / Stratocast
+
+    NOTE: This endpoint is a placeholder. Full implementation requires
+    Genetec DAP (Development Acceleration Program) membership.
+
+    Args:
+        base_url: Web SDK URL (e.g., http://server:4590/WebSdk)
+        username: Genetec username
+        password: Genetec password
+
+    Returns:
+        Error response with setup instructions
+    """
+    logger.warning("Genetec discovery requested but not implemented")
+
+    return {
+        "cameras": [],
+        "foundCameras": 0,
+        "vmsSystem": "genetec",
+        "available": False,
+        "error": {
+            "code": "NOT_IMPLEMENTED",
+            "message": "Genetec integration requires DAP membership"
+        },
+        "setup": {
+            "dapUrl": "https://www.genetec.com/partners/sdk-dap",
+            "developerPortal": "https://developer.genetec.com/",
+            "sdkSamples": "https://github.com/Genetec/Security-Center-SDK-Samples",
+            "instructions": [
+                "1. Join Genetec DAP program at https://www.genetec.com/partners/sdk-dap",
+                "2. Download and install Security Center SDK",
+                "3. Create a 'Web-based SDK' role in Genetec Config Tool",
+                "4. Configure Base URI, port, and streaming port",
+                "5. API will be available at http://<server>:<port>/WebSdk/"
+            ]
+        }
+    }
+
+
+@app.get("/api/genetec/status")
+async def get_genetec_status():
+    """
+    Get Genetec integration status
+
+    Returns information about Genetec integration availability
+    and setup instructions.
+
+    Returns:
+        Integration status and setup instructions
+    """
+    return {
+        "available": False,
+        "vmsSystem": "genetec",
+        "reason": "Genetec integration requires DAP (Development Acceleration Program) membership",
+        "setup": {
+            "dapUrl": "https://www.genetec.com/partners/sdk-dap",
+            "developerPortal": "https://developer.genetec.com/",
+            "sdkSamples": "https://github.com/Genetec/Security-Center-SDK-Samples",
+            "steps": [
+                "Join Genetec DAP program",
+                "Download Security Center SDK",
+                "Create Web-based SDK role in Config Tool",
+                "Configure endpoints and credentials"
+            ]
+        },
+        "stratocast": {
+            "description": "Stratocast is Genetec's cloud VMS offering",
+            "apiDocs": "https://developer.genetec.com/r/en-us/clearance-developer-guide/rest-api",
+            "note": "Stratocast uses Genetec Clearance APIs"
+        }
+    }
+
+
 # ---- Datasheet API endpoints ----
 
 class DatasheetSpecs(BaseModel):

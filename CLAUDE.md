@@ -27,6 +27,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
                             │  │  - onvif_client.py (ONVIF protocol) ││
                             │  │  - webrtc_signaling.py (live view)  ││
                             │  │  - hanwha_wave_client.py (WAVE VMS) ││
+                            │  │  - verkada_client.py (Verkada Cloud)││
+                            │  │  - rhombus_client.py (Rhombus Cloud)││
                             │  └─────────────────────────────────────┘│
                             │  ┌─────────────────────────────────────┐│
                             │  │ Persistence (SQLite via SQLAlchemy) ││
@@ -60,6 +62,9 @@ Key files:
 - `integrations/media2_client.py` - ONVIF Media2 service for Profile T
 - `integrations/webrtc_signaling.py` - WebRTC signaling gateway for low-latency streaming
 - `integrations/hanwha_wave_client.py` - Hanwha WAVE VMS API client
+- `integrations/verkada_client.py` - Verkada Cloud VMS API client (SaaS)
+- `integrations/rhombus_client.py` - Rhombus Cloud VMS API client (SaaS)
+- `integrations/genetec_client.py` - Genetec Security Center/Stratocast (placeholder)
 
 ## Development Commands
 
@@ -147,6 +152,32 @@ Edit `_build_optimization_prompt()` in `services/providers/claude_provider.py`
 3. Add apply adapter in `services/apply.py`
 4. Add `ApplyMethod` enum value in `models/pipeline.py`
 5. Add endpoints in `main.py`
+
+### Supported VMS Platforms
+
+| Platform | Status | Auth Method | API Base |
+|----------|--------|-------------|----------|
+| Hanwha WAVE | Full | HTTP Digest | `https://<ip>:7001/api/v1/` |
+| Verkada | Full | API Key → Token | `https://api.verkada.com/` |
+| Rhombus | Full | API Key | `https://api2.rhombussystems.com/` |
+| Genetec | Placeholder | Web SDK | Requires DAP membership |
+| Milestone | Not implemented | - | - |
+
+**Verkada Setup:**
+- Get API key from Command Dashboard > Admin > API Keys
+- Pass `api_key` as query parameter or credential
+- Org ID optional for multi-org accounts
+- EU region: use `region=eu` parameter
+
+**Rhombus Setup:**
+- Generate API key from Rhombus Console
+- Pass `api_key` as query parameter
+- Uses POST requests with JSON body
+
+**Genetec Setup (Future):**
+- Requires DAP membership: https://www.genetec.com/partners/sdk-dap
+- Web-based SDK role must be configured in Genetec Config Tool
+- Stratocast uses Clearance APIs
 
 ## Environment Variables
 

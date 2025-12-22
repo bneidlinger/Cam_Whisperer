@@ -22,6 +22,9 @@ from datetime import datetime
 
 from integrations.onvif_client import ONVIFClient, ONVIFBatchClient
 from integrations.hanwha_wave_client import HanwhaWAVEClient
+from integrations.verkada_client import VerkadaClient
+from integrations.rhombus_client import RhombusClient
+from integrations.genetec_client import GenetecClient, GenetecNotImplementedError
 
 logger = logging.getLogger(__name__)
 
@@ -751,3 +754,389 @@ class DiscoveryService:
         except Exception as e:
             logger.error(f"Failed to query WAVE current settings: {e}")
             raise
+
+
+    # ============================================================================
+    # Verkada Cloud VMS Discovery Methods
+    # ============================================================================
+
+    async def discover_verkada_cameras(
+        self,
+        api_key: str,
+        org_id: Optional[str] = None,
+        region: str = "us"
+    ) -> List[Dict]:
+        """
+        Discover cameras via Verkada Command API
+
+        Args:
+            api_key: Verkada API key from Command dashboard
+            org_id: Organization ID (optional, for multi-org accounts)
+            region: API region ("us" or "eu")
+
+        Returns:
+            List of discovered camera records
+        """
+        logger.info(f"Starting Verkada camera discovery (region: {region})...")
+
+        try:
+            # Create Verkada client
+            verkada_client = VerkadaClient(
+                api_key=api_key,
+                org_id=org_id,
+                region=region
+            )
+
+            # Test connection first
+            connected = await verkada_client.test_connection()
+            if not connected:
+                logger.error("Cannot connect to Verkada API")
+                verkada_client.close()
+                return []
+
+            # Get cameras from Verkada
+            cameras = await verkada_client.get_cameras()
+
+            # Enrich with additional metadata
+            for camera in cameras:
+                camera["discovery_method"] = "verkada"
+                camera["registered"] = False  # Will be updated by auto-register
+
+            verkada_client.close()
+
+            # Trigger background datasheet fetch for discovered cameras
+            self._trigger_datasheet_fetch(cameras)
+
+            # Auto-register discovered cameras in database
+            self._auto_register_cameras(
+                cameras,
+                discovery_method="verkada",
+                vms_system="verkada",
+            )
+
+            logger.info(f"Discovered {len(cameras)} cameras from Verkada")
+            return cameras
+
+        except Exception as e:
+            logger.error(f"Verkada discovery failed: {e}")
+            return []
+
+    async def get_verkada_camera_capabilities(
+        self,
+        api_key: str,
+        camera_id: str,
+        org_id: Optional[str] = None,
+        region: str = "us"
+    ) -> Dict:
+        """
+        Query camera capabilities via Verkada API
+
+        Args:
+            api_key: Verkada API key
+            camera_id: Verkada camera ID
+            org_id: Organization ID (optional)
+            region: API region
+
+        Returns:
+            Dictionary with capabilities
+        """
+        logger.info(f"Querying Verkada camera {camera_id} capabilities...")
+
+        try:
+            verkada_client = VerkadaClient(
+                api_key=api_key,
+                org_id=org_id,
+                region=region
+            )
+
+            # Get camera info
+            camera_info = await verkada_client.get_camera_info(camera_id)
+
+            # Get current settings
+            settings = await verkada_client.get_camera_settings(camera_id)
+
+            verkada_client.close()
+
+            # Build capabilities response
+            capabilities = {
+                "device": {
+                    "manufacturer": "Verkada",
+                    "model": camera_info.get("model", "Unknown"),
+                    "name": camera_info.get("name", "Unknown"),
+                    "serial": camera_info.get("serial", ""),
+                    "firmware": camera_info.get("firmware", "")
+                },
+                "current_settings": settings,
+                "max_resolution": settings.get("stream", {}).get("resolution", "Unknown"),
+                "cloudManaged": True,
+                "vms_managed": True,
+                "vms_system": "verkada",
+                "queried_at": datetime.utcnow().isoformat() + "Z"
+            }
+
+            return capabilities
+
+        except Exception as e:
+            logger.error(f"Failed to query Verkada camera capabilities: {e}")
+            raise
+
+    async def get_verkada_current_settings(
+        self,
+        api_key: str,
+        camera_id: str,
+        org_id: Optional[str] = None,
+        region: str = "us"
+    ) -> Dict:
+        """
+        Query current camera settings via Verkada API
+
+        Args:
+            api_key: Verkada API key
+            camera_id: Verkada camera ID
+            org_id: Organization ID (optional)
+            region: API region
+
+        Returns:
+            Dictionary with current settings
+        """
+        logger.info(f"Querying Verkada camera {camera_id} current settings...")
+
+        try:
+            verkada_client = VerkadaClient(
+                api_key=api_key,
+                org_id=org_id,
+                region=region
+            )
+
+            settings = await verkada_client.get_camera_settings(camera_id)
+
+            verkada_client.close()
+
+            # Add metadata
+            settings["queried_at"] = datetime.utcnow().isoformat() + "Z"
+            settings["vms_managed"] = True
+            settings["vms_system"] = "verkada"
+
+            return settings
+
+        except Exception as e:
+            logger.error(f"Failed to query Verkada current settings: {e}")
+            raise
+
+
+    # ============================================================================
+    # Rhombus Cloud VMS Discovery Methods
+    # ============================================================================
+
+    async def discover_rhombus_cameras(
+        self,
+        api_key: str
+    ) -> List[Dict]:
+        """
+        Discover cameras via Rhombus API
+
+        Args:
+            api_key: Rhombus API key from Console
+
+        Returns:
+            List of discovered camera records
+        """
+        logger.info("Starting Rhombus camera discovery...")
+
+        try:
+            # Create Rhombus client
+            rhombus_client = RhombusClient(api_key=api_key)
+
+            # Test connection first
+            connected = await rhombus_client.test_connection()
+            if not connected:
+                logger.error("Cannot connect to Rhombus API")
+                rhombus_client.close()
+                return []
+
+            # Get cameras from Rhombus
+            cameras = await rhombus_client.get_cameras()
+
+            # Enrich with additional metadata
+            for camera in cameras:
+                camera["discovery_method"] = "rhombus"
+                camera["registered"] = False  # Will be updated by auto-register
+
+            rhombus_client.close()
+
+            # Trigger background datasheet fetch for discovered cameras
+            self._trigger_datasheet_fetch(cameras)
+
+            # Auto-register discovered cameras in database
+            self._auto_register_cameras(
+                cameras,
+                discovery_method="rhombus",
+                vms_system="rhombus",
+            )
+
+            logger.info(f"Discovered {len(cameras)} cameras from Rhombus")
+            return cameras
+
+        except Exception as e:
+            logger.error(f"Rhombus discovery failed: {e}")
+            return []
+
+    async def get_rhombus_camera_capabilities(
+        self,
+        api_key: str,
+        camera_id: str
+    ) -> Dict:
+        """
+        Query camera capabilities via Rhombus API
+
+        Args:
+            api_key: Rhombus API key
+            camera_id: Rhombus camera UUID
+
+        Returns:
+            Dictionary with capabilities
+        """
+        logger.info(f"Querying Rhombus camera {camera_id} capabilities...")
+
+        try:
+            rhombus_client = RhombusClient(api_key=api_key)
+
+            # Get camera details
+            camera_details = await rhombus_client.get_camera_details(camera_id)
+
+            # Get camera config
+            config = await rhombus_client.get_camera_config(camera_id)
+
+            rhombus_client.close()
+
+            # Build capabilities response
+            capabilities = {
+                "device": {
+                    "manufacturer": "Rhombus",
+                    "model": camera_details.get("model", "Unknown"),
+                    "name": camera_details.get("name", "Unknown"),
+                    "serial": camera_details.get("serial", ""),
+                    "firmware": camera_details.get("firmware", "")
+                },
+                "current_settings": config,
+                "max_resolution": config.get("stream", {}).get("resolution", "Unknown"),
+                "cloudManaged": True,
+                "vms_managed": True,
+                "vms_system": "rhombus",
+                "queried_at": datetime.utcnow().isoformat() + "Z"
+            }
+
+            return capabilities
+
+        except Exception as e:
+            logger.error(f"Failed to query Rhombus camera capabilities: {e}")
+            raise
+
+    async def get_rhombus_current_settings(
+        self,
+        api_key: str,
+        camera_id: str
+    ) -> Dict:
+        """
+        Query current camera settings via Rhombus API
+
+        Args:
+            api_key: Rhombus API key
+            camera_id: Rhombus camera UUID
+
+        Returns:
+            Dictionary with current settings
+        """
+        logger.info(f"Querying Rhombus camera {camera_id} current settings...")
+
+        try:
+            rhombus_client = RhombusClient(api_key=api_key)
+
+            settings = await rhombus_client.get_camera_settings(camera_id)
+
+            rhombus_client.close()
+
+            # Add metadata
+            settings["queried_at"] = datetime.utcnow().isoformat() + "Z"
+            settings["vms_managed"] = True
+            settings["vms_system"] = "rhombus"
+
+            return settings
+
+        except Exception as e:
+            logger.error(f"Failed to query Rhombus current settings: {e}")
+            raise
+
+
+    # ============================================================================
+    # Genetec Security Center / Stratocast Methods (Placeholder)
+    # ============================================================================
+
+    async def discover_genetec_cameras(
+        self,
+        base_url: str = "",
+        username: str = "",
+        password: str = ""
+    ) -> List[Dict]:
+        """
+        Discover cameras via Genetec Security Center / Stratocast
+
+        NOTE: This is a placeholder. Full implementation requires
+        Genetec DAP (Development Acceleration Program) membership.
+
+        Args:
+            base_url: Web SDK URL (e.g., http://server:4590/WebSdk)
+            username: Genetec username
+            password: Genetec password
+
+        Returns:
+            Empty list (not implemented)
+
+        Raises:
+            GenetecNotImplementedError: With setup instructions
+        """
+        logger.warning("Genetec discovery requested but not implemented")
+
+        raise GenetecNotImplementedError("camera discovery")
+
+    async def get_genetec_camera_capabilities(
+        self,
+        base_url: str,
+        camera_id: str,
+        username: str = "",
+        password: str = ""
+    ) -> Dict:
+        """
+        Query camera capabilities via Genetec (placeholder)
+
+        Args:
+            base_url: Web SDK URL
+            camera_id: Genetec camera GUID
+            username: Genetec username
+            password: Genetec password
+
+        Raises:
+            GenetecNotImplementedError: With setup instructions
+        """
+        raise GenetecNotImplementedError("camera capabilities query")
+
+    async def get_genetec_current_settings(
+        self,
+        base_url: str,
+        camera_id: str,
+        username: str = "",
+        password: str = ""
+    ) -> Dict:
+        """
+        Query current camera settings via Genetec (placeholder)
+
+        Args:
+            base_url: Web SDK URL
+            camera_id: Genetec camera GUID
+            username: Genetec username
+            password: Genetec password
+
+        Raises:
+            GenetecNotImplementedError: With setup instructions
+        """
+        raise GenetecNotImplementedError("camera settings query")
