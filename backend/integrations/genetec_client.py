@@ -316,6 +316,38 @@ Resources:
         """Close connection and cleanup resources"""
         logger.info("Genetec client closed (placeholder)")
 
+    @staticmethod
+    def integration_profile() -> Dict[str, Any]:
+        """
+        Describe how the app should treat the Genetec integration.
+
+        Returns:
+            Dict describing supported tools, optimization surfaces, and
+            availability messaging for Genetec Security Center/Stratocast.
+        """
+        return {
+            "id": "genetec",
+            "name": "Genetec Security Center / Stratocast",
+            "deployment": "on-prem or cloud",
+            "auth": "DAP membership with Web SDK role",
+            "defaultEndpoints": ["http://<server>:4590/WebSdk/"],
+            "tools": {
+                "discovery": False,
+                "snapshots": False,
+                "settingsRead": False,
+                "settingsWrite": False,
+                "eventBridge": False,
+            },
+            "optimizations": {
+                "streamTuning": False,
+                "recordingPolicies": False,
+                "analytics": False,
+                "cloudExports": False,
+                "notes": "Requires DAP access before enabling tooling",
+            },
+            "status": check_genetec_availability(),
+        }
+
 
 # Convenience function to check integration status
 def check_genetec_availability() -> Dict:

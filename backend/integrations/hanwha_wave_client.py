@@ -552,6 +552,38 @@ class HanwhaWAVEClient:
         self.executor.shutdown(wait=False)
         logger.info("WAVE client closed")
 
+    @staticmethod
+    def integration_profile() -> Dict[str, Any]:
+        """
+        Describe the Hanwha WAVE integration surface for the app.
+
+        Returns:
+            Dict defining available tooling and optimization touch points so
+            the UI can light up the right controls for WAVE deployments.
+        """
+        return {
+            "id": "hanwha-wave",
+            "name": "Hanwha Vision WAVE",
+            "deployment": "on-prem",
+            "auth": "Digest auth or session token",
+            "defaultEndpoints": ["https://<server-ip>:7001/api"],
+            "tools": {
+                "discovery": True,
+                "snapshots": True,
+                "settingsRead": True,
+                "settingsWrite": True,
+                "eventBridge": True,
+            },
+            "optimizations": {
+                "streamTuning": True,
+                "recordingPolicies": True,
+                "analytics": False,
+                "cloudExports": False,
+                "notes": "Full config read/write enables bitrate/fps tuning and recording policy automation.",
+            },
+            "status": {"available": True, "reason": None},
+        }
+
 
 # Example usage
 if __name__ == "__main__":
