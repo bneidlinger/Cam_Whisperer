@@ -539,6 +539,38 @@ class RhombusClient:
         self.executor.shutdown(wait=False)
         logger.info("Rhombus client closed")
 
+    @staticmethod
+    def integration_profile() -> Dict[str, Any]:
+        """
+        Describe how the app should expose Rhombus tools and optimizations.
+
+        Returns:
+            Dict with capability toggles that align UI workflows with Rhombus'
+            cloud-first model.
+        """
+        return {
+            "id": "rhombus",
+            "name": "Rhombus Systems",
+            "deployment": "cloud",
+            "auth": "API token",
+            "defaultEndpoints": ["https://api2.rhombussystems.com"],
+            "tools": {
+                "discovery": True,
+                "snapshots": True,
+                "settingsRead": True,
+                "settingsWrite": True,
+                "eventBridge": True,
+            },
+            "optimizations": {
+                "streamTuning": True,
+                "recordingPolicies": True,
+                "analytics": True,
+                "cloudExports": True,
+                "notes": "API supports remote configuration so optimization playbooks can write back safely.",
+            },
+            "status": {"available": True, "reason": None},
+        }
+
 
 # Example usage
 if __name__ == "__main__":

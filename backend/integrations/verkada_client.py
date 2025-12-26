@@ -543,6 +543,38 @@ class VerkadaClient:
         self._token = None
         logger.info("Verkada client closed")
 
+    @staticmethod
+    def integration_profile() -> Dict[str, Any]:
+        """
+        Describe available tools and optimization hooks for Verkada.
+
+        Returns:
+            Dict defining supported capabilities so the app can tailor UI and
+            workflows for Verkada Command deployments.
+        """
+        return {
+            "id": "verkada",
+            "name": "Verkada Command",
+            "deployment": "cloud",
+            "auth": "API key + short-lived token",
+            "defaultEndpoints": ["https://api.verkada.com", "https://api.eu.verkada.com"],
+            "tools": {
+                "discovery": True,
+                "snapshots": True,
+                "settingsRead": True,
+                "settingsWrite": False,  # Command UI controls writes
+                "eventBridge": True,
+            },
+            "optimizations": {
+                "streamTuning": False,
+                "recordingPolicies": False,
+                "analytics": True,
+                "cloudExports": True,
+                "notes": "Use read-only telemetry to drive optimization playbooks while keeping config changes in Command.",
+            },
+            "status": {"available": True, "reason": None},
+        }
+
 
 # Example usage
 if __name__ == "__main__":
