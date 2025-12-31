@@ -310,6 +310,20 @@
       transform: none;
     }
 
+    .btn.ghost {
+      background: linear-gradient(180deg, #1f1f1f 0%, #0d0d0d 100%);
+      color: var(--green-terminal);
+      border: 1px solid var(--orange-dark);
+      box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.08);
+    }
+
+    .btn.secondary {
+      background: linear-gradient(180deg, #0d0d0d 0%, #1a1a1a 100%);
+      color: var(--text-primary);
+      border: 1px solid var(--orange-dark);
+      box-shadow: inset 0 0 10px rgba(255, 140, 66, 0.12);
+    }
+
     /* Status Badge */
     .status-badge {
       display: inline-flex;
@@ -442,6 +456,34 @@
       letter-spacing: 0.08em;
     }
 
+    .auth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    .auth-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .auth-footnote {
+      margin-top: 12px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      letter-spacing: 0.06em;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
     /* Footer */
     .terminal-footer {
       margin-top: 20px;
@@ -480,6 +522,39 @@
         <div class="subtitle">
           SECURITY SYSTEMS CONFIGURATION TERMINAL
         </div>
+      </div>
+    </div>
+
+    <!-- Auth + Preferences -->
+    <div class="panel" style="margin-bottom: 20px;">
+      <div class="panel-header">
+        <div class="panel-title">USER ACCESS // PREFERENCES</div>
+        <div class="status-badge" id="auth-status">
+          <span class="status-dot"></span>
+          <span id="auth-status-text">ANON SESSION</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="auth-grid">
+          <div class="form-group">
+            <label>EMAIL</label>
+            <input type="email" id="auth-email" placeholder="operator@site.com" />
+          </div>
+          <div class="form-group">
+            <label>FULL NAME</label>
+            <input type="text" id="auth-name" placeholder="Ops Lead" />
+          </div>
+          <div class="form-group">
+            <label>PASSWORD</label>
+            <input type="password" id="auth-password" placeholder="********" />
+          </div>
+          <div class="auth-actions">
+            <button type="button" class="btn" id="register-btn">REGISTER</button>
+            <button type="button" class="btn ghost" id="login-btn">LOGIN</button>
+            <button type="button" class="btn ghost" id="logout-btn">LOG OUT</button>
+          </div>
+        </div>
+        <div class="auth-footnote" id="auth-footnote">// SESSION: NOT AUTHENTICATED</div>
       </div>
     </div>
 
@@ -610,9 +685,14 @@
             </div>
 
             <!-- Action Button -->
-            <button type="submit" class="btn" id="generate-btn">
-              ▶ GENERATE OPTIMIZATION
-            </button>
+            <div class="button-row">
+              <button type="submit" class="btn" id="generate-btn">
+                ▶ GENERATE OPTIMIZATION
+              </button>
+              <button type="button" class="btn secondary" id="save-preferences-btn">
+                ⬩ SAVE USER PREFERENCES
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -639,6 +719,8 @@
   <script>
     // Global state
     let sampleFrameBase64 = null;
+    let authToken = localStorage.getItem('authToken');
+    let currentUser = null;
 
     // API endpoint configuration
     // If opened as file:// or localhost, use local backend
@@ -650,6 +732,167 @@
       : 'https://your-backend-url.com';  // Update when deployed
 
     console.log('API Base URL:', API_BASE);
+
+    const authStatus = document.getElementById('auth-status');
+    const authStatusText = document.getElementById('auth-status-text');
+    const authFootnote = document.getElementById('auth-footnote');
+
+    function authHeaders(additional = {}) {
+      const headers = { ...additional };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      return headers;
+    }
+
+    function setAuthToken(token) {
+      authToken = token;
+      if (token) {
+        localStorage.setItem('authToken', token);
+      } else {
+        localStorage.removeItem('authToken');
+      }
+    }
+
+    function setAuthUI(mode, message) {
+      authStatus.className = 'status-badge ' + mode;
+      authStatusText.textContent = message;
+      authFootnote.textContent = currentUser
+        ? `// SESSION: ${currentUser.email} | PREFS: ${Object.keys(currentUser.preferences || {}).length} saved`
+        : '// SESSION: NOT AUTHENTICATED';
+    }
+
+    function applyPreferencesToForm(prefs = {}) {
+      if (prefs.default_location) document.getElementById('location').value = prefs.default_location;
+      if (prefs.default_lighting) document.getElementById('lighting').value = prefs.default_lighting;
+      if (prefs.default_motion) document.getElementById('motion').value = prefs.default_motion;
+      if (prefs.default_bandwidth_mbps) document.getElementById('bandwidth').value = prefs.default_bandwidth_mbps;
+      if (prefs.default_retention_days) document.getElementById('retention').value = prefs.default_retention_days;
+    }
+
+    function collectPreferencesFromForm() {
+      return {
+        default_location: document.getElementById('location').value,
+        default_lighting: document.getElementById('lighting').value,
+        default_motion: document.getElementById('motion').value,
+        default_bandwidth_mbps: parseFloat(document.getElementById('bandwidth').value) || null,
+        default_retention_days: parseInt(document.getElementById('retention').value) || null,
+      };
+    }
+
+    async function fetchProfile() {
+      if (!authToken) return;
+      try {
+        const response = await fetch(`${API_BASE}/users/me`, {
+          headers: authHeaders()
+        });
+        if (!response.ok) throw new Error('Profile lookup failed');
+        currentUser = await response.json();
+        applyPreferencesToForm(currentUser.preferences || {});
+        setAuthUI('success', 'AUTHENTICATED');
+      } catch (err) {
+        console.warn('Profile fetch failed:', err.message);
+        setAuthToken(null);
+        currentUser = null;
+        setAuthUI('error', 'SESSION CLEARED');
+      }
+    }
+
+    async function registerUser() {
+      try {
+        const payload = {
+          email: document.getElementById('auth-email').value,
+          password: document.getElementById('auth-password').value,
+          full_name: document.getElementById('auth-name').value,
+        };
+
+        const response = await fetch(`${API_BASE}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.json();
+          throw new Error(errorBody.detail || 'Registration failed');
+        }
+
+        setAuthUI('success', 'ACCOUNT READY — LOGIN');
+        authFootnote.textContent = '// SESSION: ACCOUNT CREATED — LOGIN TO ACTIVATE';
+      } catch (err) {
+        setAuthUI('error', `AUTH ERROR: ${err.message}`);
+      }
+    }
+
+    async function loginUser() {
+      try {
+        const formData = new URLSearchParams();
+        formData.append('username', document.getElementById('auth-email').value);
+        formData.append('password', document.getElementById('auth-password').value);
+        formData.append('grant_type', 'password');
+
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.json();
+          throw new Error(errorBody.detail || 'Login failed');
+        }
+
+        const data = await response.json();
+        setAuthToken(data.access_token);
+        currentUser = data.user;
+        applyPreferencesToForm(currentUser.preferences || {});
+        setAuthUI('success', 'AUTHENTICATED');
+      } catch (err) {
+        setAuthUI('error', `AUTH ERROR: ${err.message}`);
+      }
+    }
+
+    function logoutUser() {
+      setAuthToken(null);
+      currentUser = null;
+      setAuthUI('', 'ANON SESSION');
+    }
+
+    async function savePreferences() {
+      if (!authToken) {
+        setAuthUI('error', 'LOGIN REQUIRED');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/users/me/preferences`, {
+          method: 'PATCH',
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(collectPreferencesFromForm()),
+        });
+
+        if (!response.ok) {
+          const body = await response.json();
+          throw new Error(body.detail || 'Failed to save preferences');
+        }
+
+        const prefs = await response.json();
+        if (currentUser) {
+          currentUser.preferences = prefs;
+        }
+        setAuthUI('success', 'PREFERENCES SAVED');
+      } catch (err) {
+        setAuthUI('error', `PREF ERROR: ${err.message}`);
+      }
+    }
+
+    document.getElementById('register-btn').addEventListener('click', registerUser);
+    document.getElementById('login-btn').addEventListener('click', loginUser);
+    document.getElementById('logout-btn').addEventListener('click', logoutUser);
+    document.getElementById('save-preferences-btn').addEventListener('click', savePreferences);
+
+    setAuthUI('', 'ANON SESSION');
+    fetchProfile();
 
     // Status management
     function setStatus(mode, message) {
@@ -761,7 +1004,7 @@
         // Call API
         const response = await fetch(`${API_BASE}/api/optimize`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(request)
         });
 

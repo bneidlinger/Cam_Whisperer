@@ -12,18 +12,22 @@ warnings.filterwarnings("ignore", message="unclosed.*socket")
 warnings.filterwarnings("ignore", module="wsdiscovery")
 warnings.filterwarnings("ignore", module="wsdiscovery.threaded")
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, field_validator
-from typing import Optional, List, Dict, Any
-from pathlib import Path
 import datetime
 import logging
 import traceback
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+from fastapi import Depends, FastAPI, UploadFile, File, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel, field_validator, EmailStr
+from sqlalchemy.orm import Session
 
 from config import get_settings
-from database import init_db
+from database import init_db, get_db
+from models.orm import User
 from services.optimization import get_optimization_service
 from services.discovery import DiscoveryService
 from services.apply import ApplyService, ApplyMethod
@@ -32,6 +36,12 @@ from services.camera_service import get_camera_service
 from services.emergency_record import get_emergency_record_service
 from utils.rate_limiter import get_discovery_rate_limiter, RateLimitError
 from utils.network_filter import get_network_filter, configure_network_filter, get_known_camera_ouis
+from utils.security import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    decode_token,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -49,6 +59,8 @@ app = FastAPI(
     version="0.4.0",
     description="AI-powered camera optimization with Claude Vision and ONVIF integration"
 )
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # Add CORS middleware
 app.add_middleware(
@@ -145,7 +157,126 @@ async def shutdown_event():
 
     logger.info("Shutdown complete")
 
+
+# ---- Auth & user endpoints ----
+
+
+@app.post("/auth/register", response_model=Dict[str, Any])
+def register_user(payload: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user account."""
+    existing = get_user_by_email(db, payload.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = User(
+        email=payload.email,
+        full_name=payload.full_name,
+        hashed_password=get_password_hash(payload.password),
+        preferences={},
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user_to_response(user)
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    user.last_login_at = datetime.datetime.utcnow()
+    db.add(user)
+    db.commit()
+
+    token = create_access_token(user.email)
+    return TokenResponse(access_token=token, user=user_to_response(user))
+
+
+@app.get("/users/me", response_model=Dict[str, Any])
+def get_me(current_user: User = Depends(get_current_user)):
+    return user_to_response(current_user)
+
+
+@app.patch("/users/me/preferences", response_model=Dict[str, Any])
+def update_preferences(
+    preferences: UserPreferences,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current = current_user.preferences or {}
+    updates = preferences.model_dump(exclude_none=True)
+    current.update(updates)
+    current_user.preferences = current
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user.preferences
+
 # ---- Pydantic models ----
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
+class UserPreferences(BaseModel):
+    default_location: Optional[str] = None
+    default_lighting: Optional[str] = None
+    default_motion: Optional[str] = None
+    default_bandwidth_mbps: Optional[float] = None
+    default_retention_days: Optional[int] = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: Dict[str, Any]
+
+
+def user_to_response(user: User) -> Dict[str, Any]:
+    """Return a user dictionary safe for API responses."""
+    data = user.to_dict()
+    data.pop("hashed_password", None)
+    return data
+
+
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    return db.query(User).filter(User.email == email).first()
+
+
+def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+    user = get_user_by_email(db, email)
+    if not user or not verify_password(password, user.hashed_password):
+        return None
+    return user
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    """FastAPI dependency to retrieve the authenticated user."""
+    email = decode_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user = get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return user
+
 
 class CameraRecord(BaseModel):
     id: str
