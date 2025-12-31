@@ -1052,8 +1052,17 @@ class ONVIFClient:
                 codec_map = {"H.264": "H264", "H.265": "H265", "MJPEG": "JPEG"}
                 current_config.Encoding = codec_map.get(settings["codec"], "H264")
 
-            if "gop_length" in settings and hasattr(current_config, 'H264') and current_config.H264:
-                current_config.H264.GovLength = settings["gop_length"]
+            gop_length = None
+            if "gop_length" in settings:
+                gop_length = settings["gop_length"]
+            elif "keyframe_interval" in settings:
+                gop_length = settings["keyframe_interval"]
+
+            if gop_length is not None:
+                if hasattr(current_config, 'H264') and current_config.H264:
+                    current_config.H264.GovLength = gop_length
+                elif hasattr(current_config, 'H265') and current_config.H265:
+                    current_config.H265.GovLength = gop_length
 
             # Apply configuration
             await loop.run_in_executor(

@@ -468,7 +468,7 @@ class ApplyService:
             onvif_settings["codec"] = stream_settings["codec"]
 
         if "keyframeInterval" in stream_settings:
-            onvif_settings["keyframe_interval"] = stream_settings["keyframeInterval"]
+            onvif_settings["gop_length"] = stream_settings["keyframeInterval"]
 
         return onvif_settings
 
