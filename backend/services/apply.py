@@ -190,6 +190,7 @@ class ApplyService:
             job["progress"] = 10
 
             camera = await self.onvif_client.connect_camera(ip, port, username, password)
+            preferred_profile = await self.onvif_client.get_preferred_profile(camera)
 
             job["steps"][-1]["status"] = "completed"
             job["progress"] = 20
@@ -201,10 +202,19 @@ class ApplyService:
 
             if not encoder_configs:
                 raise ValueError("No video encoder configurations found on camera")
+            config_token = None
 
-            # Use first config (main stream)
-            main_config = encoder_configs[0]
-            config_token = main_config["token"]
+            # Prefer the encoder tied to the best available profile
+            preferred_encoder_token = preferred_profile.get("video_encoder_token") if preferred_profile else None
+            if preferred_encoder_token:
+                for config in encoder_configs:
+                    if config.get("token") == preferred_encoder_token:
+                        config_token = preferred_encoder_token
+                        break
+
+            if not config_token:
+                main_config = encoder_configs[0]
+                config_token = main_config["token"]
 
             job["steps"][-1]["status"] = "completed"
             job["progress"] = 30
@@ -231,6 +241,9 @@ class ApplyService:
                 try:
                     # Get video source token
                     video_source_token = settings.get("video_source_token")
+
+                    if not video_source_token and preferred_profile:
+                        video_source_token = preferred_profile.get("video_source_token")
 
                     if not video_source_token:
                         # Try to get from media profiles
