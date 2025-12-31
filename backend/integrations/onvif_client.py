@@ -170,6 +170,16 @@ class ONVIFClient:
             cls._init_ssl_context()
         return cls._ssl_context
 
+    def _build_transport(self) -> Transport:
+        """Create a Zeep transport with caching and timeouts."""
+        cache = None
+        if self.use_cache:
+            if ONVIFClient._wsdl_cache is None:
+                self._init_wsdl_cache()
+            cache = ONVIFClient._wsdl_cache
+
+        return Transport(cache=cache, timeout=self.timeout)
+
     async def validate_camera_tls(self, ip: str, port: int = 443) -> Dict:
         """
         Validate a camera's TLS certificate (Phase 5 Security)
@@ -467,13 +477,50 @@ class ONVIFClient:
 
         try:
             loop = asyncio.get_event_loop()
-            # Note: adjust_time=True is critical for authentication
-            # ONVIF uses WS-Security with timestamps, and time drift between
-            # client and camera causes auth failures even with correct credentials
-            camera = await loop.run_in_executor(
-                self.executor,
-                lambda: ONVIFCamera(ip, port, username, password, adjust_time=True)
-            )
+            transport = self._build_transport()
+            # Prefer secure protocol and fall back to plaintext
+            candidate_endpoints = []
+            if self.use_tls:
+                candidate_endpoints.append(("https", 443))
+
+            # Avoid duplicate tuples if callers already provided 443
+            if ("http", port) not in candidate_endpoints:
+                candidate_endpoints.append(("http", port))
+
+            last_error = None
+            camera = None
+            for protocol, candidate_port in candidate_endpoints:
+                try:
+                    # Note: adjust_time=True is critical for authentication
+                    # ONVIF uses WS-Security with timestamps, and time drift between
+                    # client and camera causes auth failures even with correct credentials
+                    camera = await loop.run_in_executor(
+                        self.executor,
+                        lambda: ONVIFCamera(
+                            ip,
+                            candidate_port,
+                            username,
+                            password,
+                            adjust_time=True,
+                            protocol=protocol,
+                            transport=transport,
+                            no_cache=not self.use_cache,
+                        )
+                    )
+
+                    # If SSL is enabled, prime the shared context for downstream operations
+                    if protocol == "https" and self.use_tls:
+                        self.get_ssl_context()
+
+                    break
+                except Exception as connect_error:
+                    last_error = connect_error
+                    logger.warning(
+                        f"Connection attempt to {ip}:{candidate_port} over {protocol.upper()} failed: {connect_error}"
+                    )
+
+            if camera is None:
+                raise last_error or RuntimeError("Unable to connect to camera over any protocol")
 
             # Cache the connection
             if use_pool:
@@ -1257,6 +1304,137 @@ class ONVIFClient:
         from integrations.media2_client import Media2Client
         client = Media2Client()
         return await client.get_video_encoder_config_options(camera, config_token)
+
+    # =========================================================================
+    # PROFILE SELECTION HELPERS
+    # =========================================================================
+
+    @staticmethod
+    def _score_resolution(resolution: Optional[Any]) -> int:
+        """Return a comparable score for a resolution payload."""
+        if not resolution:
+            return 0
+
+        if isinstance(resolution, str) and "x" in resolution:
+            try:
+                width, height = map(int, resolution.lower().split("x"))
+                return width * height
+            except ValueError:
+                return 0
+
+        if isinstance(resolution, dict):
+            width = resolution.get("width")
+            height = resolution.get("height")
+            if width and height:
+                return int(width) * int(height)
+
+        return 0
+
+    @staticmethod
+    def _build_encoder_resolution_map(encoders: List[Dict]) -> Dict[str, Optional[str]]:
+        """Map encoder tokens to resolution strings for easy lookup."""
+        resolution_map: Dict[str, Optional[str]] = {}
+        for encoder in encoders:
+            token = encoder.get("token")
+            resolution = encoder.get("resolution")
+
+            if isinstance(resolution, dict):
+                width = resolution.get("width")
+                height = resolution.get("height")
+                if width and height:
+                    resolution_map[token] = f"{width}x{height}"
+            elif resolution:
+                resolution_map[token] = resolution
+
+        return resolution_map
+
+    def _pick_best_profile(
+        self,
+        profiles: List[Dict],
+        encoder_resolution_map: Dict[str, Optional[str]],
+        encoder_token_path: List[str],
+        profile_resolution_key: Optional[str] = None,
+    ) -> Optional[Dict]:
+        """Select the best profile based on the highest available resolution."""
+        best_profile: Optional[Dict] = None
+        best_score = 0
+
+        for profile in profiles:
+            encoder_token = None
+            current: Any = profile
+            for key in encoder_token_path:
+                current = current.get(key) if isinstance(current, dict) else None
+            if isinstance(current, str):
+                encoder_token = current
+
+            resolution = None
+            if profile_resolution_key and profile.get(profile_resolution_key):
+                resolution = profile.get(profile_resolution_key)
+            if not resolution and encoder_token:
+                resolution = encoder_resolution_map.get(encoder_token)
+
+            score = self._score_resolution(resolution)
+            if score > best_score:
+                best_score = score
+                best_profile = profile
+
+        return best_profile
+
+    async def get_preferred_profile(self, camera: ONVIFCamera) -> Dict[str, Any]:
+        """
+        Pick the highest-quality profile available, preferring Profile T/Media2.
+
+        Returns:
+            Dictionary with selected profile metadata
+        """
+        capabilities = await self.get_service_capabilities(camera)
+
+        # Prefer Profile T via Media2 when available
+        if capabilities.get("media2_supported"):
+            from integrations.media2_client import Media2Client
+
+            media2_client = Media2Client(timeout=self.timeout)
+            profiles = await media2_client.get_profiles(camera)
+            encoders = await media2_client.get_video_encoder_configurations(camera)
+            resolution_map = self._build_encoder_resolution_map(encoders)
+
+            best_profile = self._pick_best_profile(
+                profiles,
+                resolution_map,
+                ["configurations", "video_encoder"],
+            )
+
+            if best_profile:
+                return {
+                    "profile_token": best_profile.get("token"),
+                    "video_encoder_token": best_profile.get("configurations", {}).get("video_encoder"),
+                    "video_source_token": best_profile.get("configurations", {}).get("video_source"),
+                    "profile_t": True,
+                    "resolution": resolution_map.get(best_profile.get("configurations", {}).get("video_encoder")),
+                }
+
+        # Fallback to Profile S media service
+        media_profiles = await self.get_media_profiles(camera)
+        encoders = await self.get_video_encoder_configs(camera)
+        resolution_map = self._build_encoder_resolution_map(encoders)
+
+        best_profile = self._pick_best_profile(
+            media_profiles,
+            resolution_map,
+            ["video_encoder_token"],
+            profile_resolution_key="resolution",
+        )
+
+        if best_profile:
+            return {
+                "profile_token": best_profile.get("token"),
+                "video_encoder_token": best_profile.get("video_encoder_token"),
+                "video_source_token": best_profile.get("video_source_token"),
+                "profile_t": False,
+                "resolution": best_profile.get("resolution") or resolution_map.get(best_profile.get("video_encoder_token")),
+            }
+
+        return {}
 
 
 # =============================================================================
