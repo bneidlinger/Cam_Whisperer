@@ -26,7 +26,7 @@ from pydantic import BaseModel, field_validator, EmailStr
 from sqlalchemy.orm import Session
 
 from config import get_settings
-from database import init_db, get_db
+from database import init_db, get_db, get_db_session
 from models.orm import User
 from services.optimization import get_optimization_service
 from services.discovery import DiscoveryService
@@ -158,62 +158,6 @@ async def shutdown_event():
     logger.info("Shutdown complete")
 
 
-# ---- Auth & user endpoints ----
-
-
-@app.post("/auth/register", response_model=Dict[str, Any])
-def register_user(payload: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user account."""
-    existing = get_user_by_email(db, payload.email)
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    user = User(
-        email=payload.email,
-        full_name=payload.full_name,
-        hashed_password=get_password_hash(payload.password),
-        preferences={},
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user_to_response(user)
-
-
-@app.post("/auth/login", response_model=TokenResponse)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-
-    user.last_login_at = datetime.datetime.utcnow()
-    db.add(user)
-    db.commit()
-
-    token = create_access_token(user.email)
-    return TokenResponse(access_token=token, user=user_to_response(user))
-
-
-@app.get("/users/me", response_model=Dict[str, Any])
-def get_me(current_user: User = Depends(get_current_user)):
-    return user_to_response(current_user)
-
-
-@app.patch("/users/me/preferences", response_model=Dict[str, Any])
-def update_preferences(
-    preferences: UserPreferences,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    current = current_user.preferences or {}
-    updates = preferences.model_dump(exclude_none=True)
-    current.update(updates)
-    current_user.preferences = current
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
-    return current_user.preferences
-
 # ---- Pydantic models ----
 
 
@@ -276,6 +220,63 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found")
 
     return user
+
+
+# ---- Auth & user endpoints ----
+
+
+@app.post("/auth/register", response_model=Dict[str, Any])
+def register_user(payload: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user account."""
+    existing = get_user_by_email(db, payload.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = User(
+        email=payload.email,
+        full_name=payload.full_name,
+        hashed_password=get_password_hash(payload.password),
+        preferences={},
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user_to_response(user)
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    user.last_login_at = datetime.datetime.utcnow()
+    db.add(user)
+    db.commit()
+
+    token = create_access_token(user.email)
+    return TokenResponse(access_token=token, user=user_to_response(user))
+
+
+@app.get("/users/me", response_model=Dict[str, Any])
+def get_me(current_user: User = Depends(get_current_user)):
+    return user_to_response(current_user)
+
+
+@app.patch("/users/me/preferences", response_model=Dict[str, Any])
+def update_preferences(
+    preferences: UserPreferences,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current = current_user.preferences or {}
+    updates = preferences.model_dump(exclude_none=True)
+    current.update(updates)
+    current_user.preferences = current
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user.preferences
 
 
 class CameraRecord(BaseModel):

@@ -14,7 +14,10 @@
       "Bash(venv/Scripts/python.exe -m pytest ../tests/backend/test_optimization.py -v --tb=short)",
       "WebSearch",
       "WebFetch(domain:api-docs.rhombus.community)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(venvScriptspython -c \"import main\")",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(venv/Scripts/pip show:*)"
     ],
     "deny": [],
     "ask": []

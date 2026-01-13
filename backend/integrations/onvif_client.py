@@ -477,50 +477,13 @@ class ONVIFClient:
 
         try:
             loop = asyncio.get_event_loop()
-            transport = self._build_transport()
-            # Prefer secure protocol and fall back to plaintext
-            candidate_endpoints = []
-            if self.use_tls:
-                candidate_endpoints.append(("https", 443))
-
-            # Avoid duplicate tuples if callers already provided 443
-            if ("http", port) not in candidate_endpoints:
-                candidate_endpoints.append(("http", port))
-
-            last_error = None
-            camera = None
-            for protocol, candidate_port in candidate_endpoints:
-                try:
-                    # Note: adjust_time=True is critical for authentication
-                    # ONVIF uses WS-Security with timestamps, and time drift between
-                    # client and camera causes auth failures even with correct credentials
-                    camera = await loop.run_in_executor(
-                        self.executor,
-                        lambda: ONVIFCamera(
-                            ip,
-                            candidate_port,
-                            username,
-                            password,
-                            adjust_time=True,
-                            protocol=protocol,
-                            transport=transport,
-                            no_cache=not self.use_cache,
-                        )
-                    )
-
-                    # If SSL is enabled, prime the shared context for downstream operations
-                    if protocol == "https" and self.use_tls:
-                        self.get_ssl_context()
-
-                    break
-                except Exception as connect_error:
-                    last_error = connect_error
-                    logger.warning(
-                        f"Connection attempt to {ip}:{candidate_port} over {protocol.upper()} failed: {connect_error}"
-                    )
-
-            if camera is None:
-                raise last_error or RuntimeError("Unable to connect to camera over any protocol")
+            # Note: adjust_time=True is critical for authentication
+            # ONVIF uses WS-Security with timestamps, and time drift between
+            # client and camera causes auth failures even with correct credentials
+            camera = await loop.run_in_executor(
+                self.executor,
+                lambda: ONVIFCamera(ip, port, username, password, adjust_time=True)
+            )
 
             # Cache the connection
             if use_pool:

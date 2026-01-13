@@ -2167,6 +2167,10 @@
                       <div style="font-size: 1rem; color: var(--text-primary);" id="emergency-stat-last">--</div>
                     </div>
                   </div>
+                  <div class="result-item" style="background: var(--bg-primary); padding: 15px; border-radius: 4px; margin-top: 15px; grid-column: 1 / -1;">
+                    <div style="color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase;">Storage Folder</div>
+                    <div style="font-size: 0.85rem; color: var(--text-primary); font-family: monospace; word-break: break-all;" id="emergency-stat-folder">--</div>
+                  </div>
                 </div>
 
                 <div class="form-section" style="margin-top: 20px;">
@@ -6071,6 +6075,18 @@
           emergencyRecordingActive = false;
           updateEmergencyIndicator(false);
           resetEmergencyUI();
+          // Still show storage path and stats from last session
+          if (status.storage_path) {
+            document.getElementById('emergency-stat-folder').textContent = status.storage_path;
+          }
+          if (status.total_captures) {
+            document.getElementById('emergency-stat-captures').textContent = status.total_captures;
+            document.getElementById('emergency-stat-failed').textContent = status.failed_captures || 0;
+            const storageMb = ((status.storage_bytes || 0) / (1024 * 1024)).toFixed(2);
+            document.getElementById('emergency-stat-storage').textContent = `${storageMb} MB`;
+          }
+          // Load snapshots even when stopped
+          loadEmergencySnapshots();
         }
       } catch (error) {
         console.error('Failed to fetch emergency status:', error);
@@ -6120,6 +6136,11 @@
         }
       }
 
+      // Update storage folder path
+      if (status.storage_path) {
+        document.getElementById('emergency-stat-folder').textContent = status.storage_path;
+      }
+
       // Update buttons
       document.getElementById('emergency-start-btn').disabled = true;
       document.getElementById('emergency-stop-btn').disabled = false;
@@ -6144,6 +6165,7 @@
       document.getElementById('emergency-stat-failed').textContent = '0';
       document.getElementById('emergency-stat-storage').textContent = '0 MB';
       document.getElementById('emergency-stat-last').textContent = '--';
+      document.getElementById('emergency-stat-folder').textContent = '--';
 
       document.getElementById('emergency-start-btn').disabled = false;
       document.getElementById('emergency-stop-btn').disabled = true;
